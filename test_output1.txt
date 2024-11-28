@@ -1,0 +1,1 @@
+smash> smash pid is 11193 smash> smash pid is 11193 smash> hello> /home/student/skeleton_smash hello> /home/student/skeleton_smash hello> smash> 
