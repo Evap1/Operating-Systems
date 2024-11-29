@@ -82,22 +82,20 @@ string _getFirstArg(const char* cmd_line) {
 }
 
 string _getSecondArg(const char* cmd_line) {
-    string cmd_s = _trim(string(cmd_line));
-    
-    size_t firstSpace = cmd_s.find(' ');
-    return firstSpace == string::npos ? "" : cmd_s.substr(firstSpace + 1);
+  string cmd_s = _trim(string(cmd_line));
+  
+  size_t firstSpace = cmd_s.find(' ');
+  return firstSpace == string::npos ? "" : cmd_s.substr(firstSpace + 1);
 }
 
 string _getThirdArg(const char* cmd_line, const char* secondArg) {
-    string cmd_s = _trim(string(cmd_line));
-    
-    size_t firstSpace = cmd_s.find(' ');
-    if (firstSpace == string::npos) return "";
+  string cmd_s = _trim(string(cmd_line));
+  
+  size_t firstSpace = cmd_s.find(' ');
+  if (firstSpace == string::npos) return "";
 
-    size_t secondSpace = cmd_s.find(' ', firstSpace + 1);
-    if (secondSpace == string::npos) return "";
-
-    return cmd_s.substr(secondSpace + 1);
+  size_t secondSpace = cmd_s.find(' ', firstSpace + 1);
+  return secondSpace == string::npos ? "" : cmd_s.substr(secondSpace + 1);
 }
 
 bool _isPositiveInteger(const std::string& str) {
@@ -111,7 +109,7 @@ bool _isPositiveInteger(const std::string& str) {
     return true;
 }
 
-bool _isNegativeInteger(const std::string& str) {
+bool _isSingal(const std::string& str) {
   if (str.empty() || str.length() == 1) {
     return false;
   }
@@ -123,7 +121,41 @@ bool _isNegativeInteger(const std::string& str) {
       return false;  // If a non-digit character is found, return false
     }
   }
+  if (-stoi(str) < 0 || -stoi(str) > 32) {
+    return false;
+  }
   return true;
+}
+
+bool isInPATHEnvVar(const char* arg) {
+  char *pathEnv = getenv("PATH");
+  if (!pathEnv) {
+    perror("smash error: getenv failed");
+    return false;
+  }
+
+  std::istringstream pathStream(pathEnv);
+  std::string pathDir;
+
+  while (std::getline(pathStream, pathDir, ':')) {
+    
+    std::string fullPath = pathDir + "/" + arg;    // construct the full path to the command
+
+    if (access(fullPath.c_str(), X_OK) == 0) {     // check if the file exists and is executable
+      return true;
+    }
+  }
+  return false;
+}
+
+bool containsWildcards(char** args) {
+  for (int i = 1; i < COMMAND_MAX_ARGS; ++i) {
+    if (!args[i]) return false;
+    else if (args[i][0] == '*' || args[i][0] == '?') { 
+      return true;
+    }
+  }
+  return false;  // No wildcards found
 }
 
 Command::Command(const char *cmd_line){
@@ -188,7 +220,7 @@ void FGCommand::execute() {
     ID =  stoi(jobID);
   }
   else if (SmallShell::getInstance().getJobs()->isEmpty()){
-    std::cout << "smash error: fg: jobs list is empty" << std::endl;
+    std::cerr << "smash error: fg: jobs list is empty" << std::endl;
     return;
   }
   else {
@@ -198,19 +230,14 @@ void FGCommand::execute() {
   JobsList::JobEntry* job = SmallShell::getInstance().getJobs()->getJobById(ID);
 
   if (!job) {
-    std::cout << "smash error: fg: job-id " << ID << " does not exist" << std::endl;
+    std::cerr << "smash error: fg: job-id " << ID << " does not exist" << std::endl;
     return;
   }
-  
-  //probably need to change
-  int pid = fork();
-  if (pid == 0) { //child
-  std::cout <<  "im a child";
-  //execute the task
-  }
-  else {          //father
-  std::cout << pid << std::endl; //should also print the proccess line but we didnt implement the functions yet
-  waitpid(pid, NULL, WUNTRACED); //not sure about the flag
+  else {
+    std::cout << job->getCommandLine() << " " << job->getPID() << std::endl;
+    job->isActive = false;
+    waitpid(job->getPID(), NULL, 0);
+    SmallShell::getInstance().getJobs()->removeJobById(ID);
   }
   return;
 }
@@ -221,17 +248,18 @@ QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(
 }
 
 void QuitCommand::execute() {
+  this->jobs->removeFinishedJobs();
+
   string secondArg = _getSecondArg(this->cmd_line.c_str());
   if (!secondArg.compare("kill")) {
-    std::cout << "sending SIGKILL signal to " << jobs->jobs.size() << " jobs:";
+    std::cout << "smash: sending SIGKILL signal to " << jobs->jobs.size() << " jobs:" << std::endl;
 
-    //need to print the pid number as well
-    //also need to kill the jobs
-
-  for (auto it = jobs->jobs.begin(); it != jobs->jobs.end();) {
-    std::cout << it->getName() << " " << it->getFullCommandArgs() << std::endl;
-  }
-  jobs->killAllJobs();
+    for (auto it = jobs->jobs.begin(); it != jobs->jobs.end();) {
+      std::cout << it->getPID() << ": "<< it->getPID() << " "<< it->getCommandLine() << std::endl;
+      kill(it->getPID(), SIGKILL);
+      it->isActive = false;
+      it = jobs->jobs.erase(it);
+    }
   }
   exit(0);
 }
@@ -242,27 +270,34 @@ KillCommand::KillCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(
 }
 
 void KillCommand::execute() {
+  this->jobs->removeFinishedJobs();
   string secondArg = _getSecondArg(this->cmd_line.c_str());
   string thirdArg = _getThirdArg(this->cmd_line.c_str(), secondArg.c_str());
-//only 1-2 args or not valid numbers or not a valid signal
-
-  if ((!secondArg.compare("kill") || !thirdArg.compare("kill")) &&
-      (_isNegativeInteger(secondArg) || !_isPositiveInteger(thirdArg)) &&
-      ((stoi(secondArg) > -1) || (stoi(secondArg) < -32))) {
-        std::cout << "smash error: kill: invalid arguments" << std::endl;
+  
+  //only 1-2 args or not valid numbers or not a valid signal
+  if ((!secondArg.compare("") || !thirdArg.compare("")) &&
+      (_isSingal(secondArg) || !_isPositiveInteger(thirdArg))) {
+        std::cerr << "smash error: kill: invalid arguments" << std::endl;
     return;
   }
   int ID = stoi(thirdArg);
   JobsList::JobEntry* job = jobs->getJobById(ID);
 
   if (!job) {
-    std::cout << "smash error: kill: job-id " << ID << " does not exist" << std::endl;
+    std::cerr << "smash error: kill: job-id " << ID << " does not exist" << std::endl;
     return;
   }
 
   //need to kill job when adding the function
+  int signal = -stoi(secondArg);
+  std::cout << "signal number " << signal <<" was sent to pid " << job->getPID() << std::endl;
+  kill(job->getPID(), signal);
 
-  jobs->removeJobById(stoi(thirdArg));
+  if (signal == SIGKILL) {
+    job->isActive = false;
+  }
+
+  jobs->removeFinishedJobs();
 }
 
 bool JobsList::isEmpty() {
@@ -273,19 +308,16 @@ JobsList::JobsList() {
   this->nextJobID = 1;
 }
 
-JobsList::JobEntry::JobEntry(int ID, const char* name, const char* fullCommandArgs, bool isStopped) {
+JobsList::JobEntry::JobEntry(int ID,pid_t pid, Command* command, bool isActive) {
   this->ID = ID;
-  this->name = name;
-  this->fullCommandArgs = fullCommandArgs;
-  this->isActive = isStopped;
+  this->pid = pid;
+  this->command = command;
+  this->isActive = isActive;
 }
 
-void JobsList::addJob(Command *cmd, bool isStopped) {
+void JobsList::addJob(Command *cmd, pid_t pid, bool isActive) {
   removeFinishedJobs();
-  //implement decifering the job and entering the details - later
-  string name = "bruh";
-  string fullCommandArgs = "yeah boi";
-  this->jobs.emplace_back(nextJobID++, name.c_str(), fullCommandArgs.c_str(), isStopped);
+  this->jobs.emplace_back(nextJobID++, pid, cmd, isActive);
 }
 
 void JobsList::printJobsList() {
@@ -300,7 +332,7 @@ JobsList* SmallShell::getJobs() {
 }
 
 void JobsList::JobEntry::printEntry() const {
-  std::cout << "[" << this->ID << "] " << this->name << " " << this->fullCommandArgs;
+  std::cout << "[" << this->ID << "] " << this->command->getLine() << std::endl;
 }
 
 void JobsList::killAllJobs() {
@@ -308,17 +340,19 @@ void JobsList::killAllJobs() {
   for (auto& job : jobs) {
     job.isActive = false;
   }
-  jobs.clear();
+  removeFinishedJobs();
 }
 
-//fill in
 void JobsList::removeFinishedJobs() {
-  for (auto it = jobs.begin(); it != jobs.end(); ) {
-    if (!it->isActive) {  // If job is not active
-      it = jobs.erase(it);  // Remove job and get the new iterator
+  for (auto it = jobs.begin(); it != jobs.end();) {
+    int status;
+    pid_t result = waitpid(it->getPID(), &status, WNOHANG);
+    if ((result == it->getPID() &&
+        (WIFEXITED(status) || WIFSIGNALED(status))) || !it->isActive) {
+      it = jobs.erase(it);
     }
     else {
-      ++it;  // Otherwise, just move to the next job
+      ++it;
     }
   }
 }
@@ -362,13 +396,14 @@ int JobsList::JobEntry::getID(){
   return this->ID;
 }
 
-string JobsList::JobEntry::getName()
+pid_t JobsList::JobEntry::getPID()
 {
-    return this->name;
+    return this->pid;
 }
-string JobsList::JobEntry::getFullCommandArgs()
+
+string JobsList::JobEntry::getCommandLine()
 {
-    return this->fullCommandArgs;
+    return this->command->getLine();
 }
 
 JobsList::JobEntry *SmallShell::head()
@@ -393,6 +428,66 @@ int JobsList::zombieTheJob(int jobId) {
     return 0;
   }
   return -1;
+}
+
+ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {
+  this->cmd_line = cmd_line;
+}
+
+void ExternalCommand::execute() {
+  bool backgroundFlag = _isBackgroundComamnd(this->cmd_line.c_str());  // check if background
+  char* ptr = (char *)this->cmd_line.c_str();
+  if (backgroundFlag) {
+    _removeBackgroundSign(ptr);
+  }
+
+  char* args[COMMAND_MAX_ARGS + 1];
+  int numOfArgs = _parseCommandLine(ptr, args);
+  if (!numOfArgs) return;
+  
+  args[COMMAND_MAX_ARGS] = nullptr;
+
+  pid_t pid = fork();
+  if (pid == -1) {
+    perror("smash error: fork failed");
+    return;
+  }
+
+  if (pid == 0) {  // Child process
+    setpgrp();
+    if(isInPATHEnvVar(args[0])) {           // check if in PATH environment
+      if (containsWildcards(args)) {
+        const char* bashPath = "/bin/bash";
+        const char* const bashArgs[] = {bashPath, "-c", (char*)cmd_line.c_str(), 0};
+
+        execvp(bashPath, const_cast<char**>(bashArgs));
+        perror("smash error: execvp failed");
+        exit(EXIT_FAILURE);
+      }
+      else {
+        execvp(args[0], args);
+        perror("smash error: execvp failed");
+        exit(EXIT_FAILURE);
+      }
+    }
+    else {
+      exit(0);
+    }
+  }
+  else if (!backgroundFlag){  // Parent process
+    int status;
+    if (waitpid(pid, &status, 0) == -1) {
+      perror("smash error: waitpid failed");
+    }
+  }
+  else {
+    // bye felicia
+    SmallShell::getInstance().getJobs()->addJob(this, pid);
+  }
+
+  for (int i = 0; i < numOfArgs; ++i) {
+    free(args[i]);
+  }
 }
 
 SmallShell::SmallShell() {
@@ -476,9 +571,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
   else if (firstWord.compare("kill") == 0) {
     return new KillCommand(cmd_line, this->jobs);
   }
-  /*else {
+  else {
     return new ExternalCommand(cmd_line);
-  }*/
+  }
 
     return nullptr;
 }

@@ -35,6 +35,8 @@ public:
 };
 
 class ExternalCommand : public Command {
+private:
+    std::string cmd_line;
 public:
     ExternalCommand(const char *cmd_line);
 
@@ -154,12 +156,12 @@ public:
     private:
         // TODO: Add your data members
         int ID;
-        std::string name;
-        std::string fullCommandArgs;
+        pid_t pid;
+        Command* command;
         
     public:
         bool isActive;
-        JobEntry(int ID, const char* name, const char* fullCommandArgs, bool isStopped);
+        JobEntry(int ID, pid_t pid, Command* command, bool isActive);
 
         ~JobEntry(){
 
@@ -171,9 +173,9 @@ public:
 
         int getID();
 
-        std::string getName();
+        pid_t getPID();
 
-        std::string getFullCommandArgs();
+        std::string getCommandLine();
     };
     // TODO: Add your data members
     std::vector<JobEntry> jobs;
@@ -185,7 +187,7 @@ public:
 
     }
 
-    void addJob(Command *cmd, bool isStopped = false);
+    void addJob(Command *cmd, pid_t pid, bool isActive = true);
 
     void printJobsList();
 
