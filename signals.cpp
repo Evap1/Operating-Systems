@@ -7,4 +7,6 @@ using namespace std;
 
 void ctrlCHandler(int sig_num) {
     // TODO: Add your implementation
+    std::cout << "smash: got ctrl-C" << std::endl;
+    SmallShell::getInstance().getJobs()->killAllJobs();
 }

@@ -127,6 +127,10 @@ bool _isSingal(const std::string& str) {
   return true;
 }
 
+bool _moreThanXArgs(const std::string& str, unsigned int X) {
+  return (str.length() > X) ? true : false;
+}
+
 bool isInPATHEnvVar(const char* arg) {
   char *pathEnv = getenv("PATH");
   if (!pathEnv) {
@@ -216,7 +220,11 @@ FGCommand::FGCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
 void FGCommand::execute() {
   int ID;
   string jobID = _getSecondArg(this->cmd_line.c_str());
-  if (jobID.compare("") && _isPositiveInteger(jobID)) { // need to check for third argument
+  string thirdArg = _getThirdArg(this->cmd_line.c_str(), jobID.c_str());
+  if (!thirdArg.empty()) {
+    std::cerr << "smash error: fg: invalid arguments" << std::endl;
+  }
+  else if (jobID.compare("") && _isPositiveInteger(jobID)) { // need to check for third argument
     ID =  stoi(jobID);
   }
   else if (SmallShell::getInstance().getJobs()->isEmpty()){
@@ -336,9 +344,10 @@ void JobsList::JobEntry::printEntry() const {
 }
 
 void JobsList::killAllJobs() {
-  // also need to actually kill them
   for (auto& job : jobs) {
     job.isActive = false;
+    std::cout << "smash: process " << job.getPID() <<" was killed" << std::endl;
+    kill(job.getPID(), SIGKILL);
   }
   removeFinishedJobs();
 }
@@ -419,15 +428,7 @@ JobsList::JobEntry *SmallShell::tail()
   if (!this->jobs->jobs.empty()) {
     return &this->jobs->jobs.back();
   }
-  return nullptr;}
-
-int JobsList::zombieTheJob(int jobId) {
-  JobEntry* job = getJobById(jobId);
-  if(job) {
-    job->isActive = false;
-    return 0;
-  }
-  return -1;
+  return nullptr;
 }
 
 ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {

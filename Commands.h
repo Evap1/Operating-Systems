@@ -201,10 +201,6 @@ public:
 
     JobEntry *getLastJob(int *lastJobId);
 
-    JobEntry *getLastStoppedJob(int *jobId);
-
-    int zombieTheJob(int jobId);
-
     // TODO: Add extra methods or modify exisitng ones as needed
     int getLastJobID();
 
