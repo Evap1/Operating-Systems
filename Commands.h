@@ -20,6 +20,8 @@ public:
     //virtual void prepare();
     //virtual void cleanup();
     // TODO: Add your extra methods if needed
+
+    std::string getLine();
 };
 
 class BuiltInCommand : public Command {
@@ -119,20 +121,12 @@ public:
 
 class JobsList;
 
-class GetJobsCommand : public BuiltInCommand {
-private:
-    std::string cmd_line;
-public:
-    GetJobsCommand(const char *cmd_line);
-
-    virtual ~GetJobsCommand() {
-    }
-
-    void execute() override;
-};
-
 class QuitCommand : public BuiltInCommand {
+private:
     // TODO: Add your data members public:
+    std::string cmd_line;
+    JobsList *jobs;
+public:
     QuitCommand(const char *cmd_line, JobsList *jobs);
 
     virtual ~QuitCommand() {
@@ -141,6 +135,18 @@ class QuitCommand : public BuiltInCommand {
     void execute() override;
 };
 
+class KillCommand : public BuiltInCommand {
+    // TODO: Add your data members
+    std::string cmd_line;
+    JobsList *jobs;
+public:
+    KillCommand(const char *cmd_line, JobsList *jobs);
+
+    virtual ~KillCommand() {
+    }
+
+    void execute() override;
+};
 
 class JobsList {
 public:
@@ -150,23 +156,28 @@ public:
         int ID;
         std::string name;
         std::string fullCommandArgs;
-        bool isStopped;
         
-
     public:
-        JobEntry* next;
-        JobEntry(int ID, const char* name, const char* fullCommandArgs);
+        bool isActive;
+        JobEntry(int ID, const char* name, const char* fullCommandArgs, bool isStopped);
 
         ~JobEntry(){
 
         }
 
-        void printEntry();
+        void printEntry() const;
+
+        bool equalsToID(int jobId);
+
+        int getID();
+
+        std::string getName();
+
+        std::string getFullCommandArgs();
     };
     // TODO: Add your data members
-    JobEntry* head;
-    JobEntry* tail;
-    int numberOfJobs;
+    std::vector<JobEntry> jobs;
+    int nextJobID;
 public:
     JobsList();
 
@@ -190,11 +201,18 @@ public:
 
     JobEntry *getLastStoppedJob(int *jobId);
 
+    int zombieTheJob(int jobId);
+
     // TODO: Add extra methods or modify exisitng ones as needed
+    int getLastJobID();
+
+    bool isEmpty();
 };
 
 class JobsCommand : public BuiltInCommand {
     // TODO: Add your data members
+    std::string cmd_line;
+    JobsList *jobs;
 public:
     JobsCommand(const char *cmd_line, JobsList *jobs);
 
@@ -204,12 +222,13 @@ public:
     void execute() override;
 };
 
-class KillCommand : public BuiltInCommand {
+class FGCommand : public BuiltInCommand {
     // TODO: Add your data members
+    std::string cmd_line;
 public:
-    KillCommand(const char *cmd_line, JobsList *jobs);
+    FGCommand(const char *cmd_line);
 
-    virtual ~KillCommand() {
+    virtual ~FGCommand() {
     }
 
     void execute() override;
@@ -318,6 +337,12 @@ public:
     std::string* getLastDirectory(){
         return &lastPwd;
     }
+
+    JobsList::JobEntry* head();
+
+    JobsList::JobEntry* tail();
+
+    JobsList* getJobs();
 };
 
 #endif //SMASH_COMMAND_H_
