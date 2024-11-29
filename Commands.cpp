@@ -149,7 +149,7 @@ void CHPromptCommand::execute() {
 }
 // TODO: Add your implementation for classes in Commands.h 
 void SmallShell::changePrompt(const string newPrompt) {
-  this->promptName = newPrompt == "chprompt" ? "smash> " : newPrompt + "> ";
+  this->promptName = newPrompt == "" ? "smash> " : newPrompt + "> ";
 }
 
 string SmallShell::getPrompt() {
@@ -184,7 +184,7 @@ FGCommand::FGCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
 void FGCommand::execute() {
   int ID;
   string jobID = _getSecondArg(this->cmd_line.c_str());
-  if (jobID.compare("fg") && _isPositiveInteger(jobID)) { // need to check for third argument
+  if (jobID.compare("") && _isPositiveInteger(jobID)) { // need to check for third argument
     ID =  stoi(jobID);
   }
   else if (SmallShell::getInstance().getJobs()->isEmpty()){
