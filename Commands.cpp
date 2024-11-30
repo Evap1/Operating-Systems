@@ -506,7 +506,7 @@ SmallShell::SmallShell() {
   this->promptName = "smash> ";
   this->currPwd = getcwd(nullptr, 0);
   this->lastPwd = "-1";
-  this->builtInCommands = {"alias"};
+  this->builtInCommands = {"alias", "unalias", "chprompt", "showpid", "pwd", "cd", "jobs", "fg", "quit", "kill"};
   this->jobs = new JobsList();
 }
 
@@ -691,7 +691,7 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
   else if (firstWord.compare("unalias") == 0) {
     return new unaliasCommand(cmd_s, smash.aliasMap);
   }
-  else if (firstWord.compare("chprompt") == 0) {
+  else if (firstWord.compare("chprompt") == 0) { 
     return new CHPromptCommand(cmd_s);
   }
   else if (firstWord.compare("showpid") == 0) {
