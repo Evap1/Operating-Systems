@@ -2,9 +2,11 @@
 #define SMASH_COMMAND_H_
 
 #include <vector>
+#include <set>
+#include <map>
 #define COMMAND_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
-
+#define INVALID_PDIR ("-1");
 class Command {
     // TODO: Add your data members
 private:
@@ -71,7 +73,7 @@ public:
 class ChangeDirCommand : public BuiltInCommand {
 private:
     std::string dir_to_repl;
-    std::string* last_pwd;
+    std::string last_pwd;
     
 public:
     // TODO: Add your data members public:
@@ -275,8 +277,12 @@ public:
 };
 
 class aliasCommand : public BuiltInCommand {
+private:
+    std::string newCommand;
+    std::map<std::string, std::string>& aliasMap;
+    std::set<std::string>& builtInCommands;
 public:
-    aliasCommand(const char *cmd_line);
+    aliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap, std::set<std::string>& builtInCommands);
 
     virtual ~aliasCommand() {
     }
@@ -285,8 +291,11 @@ public:
 };
 
 class unaliasCommand : public BuiltInCommand {
+private:
+    std::string cmd_line;
+    std::map<std::string, std::string>& aliasMap;
 public:
-    unaliasCommand(const char *cmd_line);
+    unaliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap);
 
     virtual ~unaliasCommand() {
     }
@@ -300,12 +309,14 @@ private:
     // TODO: Add your data members
     std::string promptName;
     std::string currPwd;
-    std::string lastPwd;
     JobsList* jobs;
 
     SmallShell();
 
 public:
+    std::set<std::string> builtInCommands;
+    std::map<std::string, std::string> aliasMap;
+    std::string lastPwd;
     Command *CreateCommand(const char *cmd_line);
 
     SmallShell(SmallShell const &) = delete; // disable copy ctor
@@ -329,12 +340,7 @@ public:
 
     std::string getCurrentDirectory();
 
-    // todo , eva
     void setCurrentDirectory(const std::string newDir);
-
-    std::string* getLastDirectory(){
-        return &lastPwd;
-    }
 
     JobsList::JobEntry* head();
 
