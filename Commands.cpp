@@ -278,10 +278,9 @@ KillCommand::KillCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(
 }
 
 void KillCommand::execute() {
-  this->jobs->removeFinishedJobs();
   string secondArg = _getSecondArg(this->cmd_line.c_str());
   string thirdArg = _getThirdArg(this->cmd_line.c_str(), secondArg.c_str());
-  
+
   //only 1-2 args or not valid numbers or not a valid signal
   if ((!secondArg.compare("") || !thirdArg.compare("")) &&
       (_isSingal(secondArg) || !_isPositiveInteger(thirdArg))) {
@@ -295,9 +294,8 @@ void KillCommand::execute() {
     std::cerr << "smash error: kill: job-id " << ID << " does not exist" << std::endl;
     return;
   }
-
   //need to kill job when adding the function
-  int signal = -stoi(secondArg);
+  int signal = abs(stoi(secondArg));
   std::cout << "signal number " << signal <<" was sent to pid " << job->getPID() << std::endl;
   kill(job->getPID(), signal);
 
@@ -354,10 +352,9 @@ void JobsList::killAllJobs() {
 
 void JobsList::removeFinishedJobs() {
   for (auto it = jobs.begin(); it != jobs.end();) {
-    int status;
+    int status = 0;
     pid_t result = waitpid(it->getPID(), &status, WNOHANG);
-    if ((result == it->getPID() &&
-        (WIFEXITED(status) || WIFSIGNALED(status))) || !it->isActive) {
+    if ((WIFSIGNALED(status)) || (result == it->getPID() && (WIFEXITED(status)))) {
       it = jobs.erase(it);
     }
     else {
@@ -456,20 +453,20 @@ void ExternalCommand::execute() {
 
   if (pid == 0) {  // Child process
     setpgrp();
+
     if(isInPATHEnvVar(args[0])) {           // check if in PATH environment
       if (containsWildcards(args)) {
         const char* bashPath = "/bin/bash";
         const char* const bashArgs[] = {bashPath, "-c", (char*)cmd_line.c_str(), 0};
 
-        execvp(bashPath, const_cast<char**>(bashArgs));
-        perror("smash error: execvp failed");
-        exit(EXIT_FAILURE);
+        execv(bashPath, const_cast<char**>(bashArgs));
+        perror("smash error: execv failed");
       }
       else {
         execvp(args[0], args);
         perror("smash error: execvp failed");
-        exit(EXIT_FAILURE);
       }
+      exit(EXIT_FAILURE);
     }
     else {
       exit(0);
