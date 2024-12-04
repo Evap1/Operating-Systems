@@ -106,23 +106,6 @@ string _getFirstArg(const char* cmd_line) {
   return cmd_s.substr(0, cmd_s.find_first_of(" \n"));
 }
 
-string _getSecondArg(const char* cmd_line) {
-  string cmd_s = _trim(string(cmd_line));
-  
-  size_t firstSpace = cmd_s.find(' ');
-  return firstSpace == string::npos ? "" : cmd_s.substr(firstSpace + 1);
-}
-
-string _getThirdArg(const char* cmd_line, const char* secondArg) {
-  string cmd_s = _trim(string(cmd_line));
-  
-  size_t firstSpace = cmd_s.find(' ');
-  if (firstSpace == string::npos) return "";
-
-  size_t secondSpace = cmd_s.find(' ', firstSpace + 1);
-  return secondSpace == string::npos ? "" : cmd_s.substr(secondSpace + 1);
-}
-
 bool _isPositiveInteger(const std::string& str) {
     if (str.empty()) return false;
 
@@ -201,8 +184,13 @@ BuiltInCommand::BuiltInCommand(const char *cmd_line) : Command(cmd_line) {
 }
 
 CHPromptCommand::CHPromptCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
-  string newPrompt = _getSecondArg(cmd_line);
-  this->newPromptName =  newPrompt;
+  char* args[COMMAND_MAX_ARGS];
+  string line = cmd_line;
+  int numOfArgs = _parseCommandLine(line.c_str(), args);    // parse the command line
+  if (!numOfArgs) return;
+
+  this->newPromptName =  args[1] ? args[1]: "";
+  _argsFree(numOfArgs, args);
 }
 
 void CHPromptCommand::execute() {
@@ -244,10 +232,19 @@ FGCommand::FGCommand(const char *cmd_line) : BuiltInCommand(cmd_line) {
 
 void FGCommand::execute() {
   int ID;
-  string jobID = _getSecondArg(this->cmd_line.c_str());
-  string thirdArg = _getThirdArg(this->cmd_line.c_str(), jobID.c_str());
+
+  char* args[COMMAND_MAX_ARGS];
+  string line = cmd_line;
+  int numOfArgs = _parseCommandLine(line.c_str(), args);    // parse the command line
+  if (!numOfArgs) return;
+
+  string jobID = args[1] ? args[1] : "";
+  string thirdArg = args[2] ? args[2] : "";
+  _argsFree(numOfArgs, args);
+
   if (!thirdArg.empty()) {
     std::cerr << "smash error: fg: invalid arguments" << std::endl;
+    return;
   }
   else if (jobID.compare("") && _isPositiveInteger(jobID)) { // need to check for third argument
     ID =  stoi(jobID);
@@ -283,7 +280,14 @@ QuitCommand::QuitCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(
 void QuitCommand::execute() {
   this->jobs->removeFinishedJobs();
 
-  string secondArg = _getSecondArg(this->cmd_line.c_str());
+  char* args[COMMAND_MAX_ARGS];
+  string line = cmd_line;
+  int numOfArgs = _parseCommandLine(line.c_str(), args);    // parse the command line
+  if (!numOfArgs) return;
+
+  string secondArg = args[1] ? args[1] : "";
+  _argsFree(numOfArgs, args);
+  
   if (!secondArg.compare("kill")) {
     std::cout << "smash: sending SIGKILL signal to " << jobs->jobs.size() << " jobs:" << std::endl;
 
@@ -303,9 +307,16 @@ KillCommand::KillCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(
 }
 
 void KillCommand::execute() {
-  string secondArg = _getSecondArg(this->cmd_line.c_str());
-  string thirdArg = _getThirdArg(this->cmd_line.c_str(), secondArg.c_str());
 
+  char* args[COMMAND_MAX_ARGS];
+  string line = cmd_line;
+  int numOfArgs = _parseCommandLine(line.c_str(), args);    // parse the command line
+  if (!numOfArgs) return;
+
+  string secondArg = args[1] ? args[1] : "";
+  string thirdArg = args[2] ? args[2] : "";
+  _argsFree(numOfArgs, args);
+  
   //only 1-2 args or not valid numbers or not a valid signal
   if ((!secondArg.compare("") || !thirdArg.compare("")) &&
       (_isSingal(secondArg) || !_isPositiveInteger(thirdArg))) {
@@ -545,8 +556,15 @@ void ShowPidCommand::execute() {
 */
 ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd) : BuiltInCommand(cmd_line){
   //this->last_pwd = plastPwd;
-  string newDir = _getSecondArg(cmd_line);
-  this->dir_to_repl =  newDir;
+  
+  char* args[COMMAND_MAX_ARGS];
+  string line = cmd_line;
+  int numOfArgs = _parseCommandLine(line.c_str(), args);    // parse the command line
+  if (!numOfArgs) return;
+
+  this->dir_to_repl =  args[1] ? args[1] : "";
+  _argsFree(numOfArgs, args);
+
 }
 
 void ChangeDirCommand::execute(){
@@ -563,17 +581,20 @@ void ChangeDirCommand::execute(){
   // max args allowed is 1:
   else if (argCount > 1){
     std::cerr << "smash error: cd: too many arguments" << std::endl;
+    return;
   }
   // go back to previous dir
   else if (strcmp(args[0] ,"-") == 0){
     // if dir wasn't changed before
     if (strcmp(smash.lastPwd.c_str() ,"-1") == 0){
       std::cerr << "smash error: cd: OLDPWD not set" << std::endl;
+      return;
     }
     // change to prev dir
     else{
       if(chdir(smash.lastPwd.c_str()) != 0){
         std::perror("smash error: chdir failed");
+        return;
       }
       else{
         smash.lastPwd = cwd;
@@ -587,7 +608,6 @@ void ChangeDirCommand::execute(){
         std::perror("smash error: chdir failed");
       }
       else{
-        std::cerr << "the operation is " << args[0] << std::endl;
         smash.lastPwd = cwd;
         smash.setCurrentDirectory(getcwd(nullptr, 0));
       }
@@ -604,7 +624,13 @@ aliasCommand::aliasCommand(const char *cmd_line, std::map<std::string, std::stri
                                                                                                                                         builtInCommands(builtInCommands), 
                                                                                                                                         BuiltInCommand(cmd_line)
 {
-  this->newCommand = _getSecondArg(cmd_line);
+  char* args[COMMAND_MAX_ARGS];
+  string line = cmd_line;
+  int numOfArgs = _parseCommandLine(line.c_str(), args);    // parse the command line
+  if (!numOfArgs) return;
+
+  this->newCommand = args[1] ? args[1]: "";
+  _argsFree(numOfArgs, args);
 }
 
 void aliasCommand::execute(){
@@ -625,6 +651,7 @@ void aliasCommand::execute(){
       // alias name conflicts with an existing alias or a reserved keyword
       if(this->builtInCommands.find(name) != this->builtInCommands.end() || this->aliasMap.find(name) != this->aliasMap.end()){
         std::cerr << "smash error: alias: "<< name <<" already exists or is a reserved command" << std::endl;
+        return;
       }
       // add to map the aliased name and command
       else{
@@ -634,12 +661,14 @@ void aliasCommand::execute(){
         }
         else{
           std::cerr << "smash error: alias: invalid syntax" << std::endl;
+          return;
         }
       }
     }
     // invalid syntax
     else{
       std::cerr << "smash error: alias: invalid syntax" << std::endl;
+      return;
     }
   }
 }
@@ -659,6 +688,7 @@ void unaliasCommand::execute(){
 
   if (argCount == 1){
     std::cerr << "smash error: unalias: not enough arguments" << std::endl;
+    return;
   }
   for( int i = 1; i<argCount; i++){
     // the name found
@@ -667,7 +697,7 @@ void unaliasCommand::execute(){
     }
     else{
       std::cerr << "smash error: unalias: "<< args[i] <<" alias does not exist" << std::endl;
-      break;
+      return;
     }
   }
   _argsFree(argCount, args);
