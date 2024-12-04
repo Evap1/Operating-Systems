@@ -59,12 +59,14 @@ public:
     void execute() override;
 };
 
-class RedirectionCommand : public Command {
+class RedirectIOCommand : public Command {
+private:
     // TODO: Add your data members
+    std::string cmd_line;
 public:
-    explicit RedirectionCommand(const char *cmd_line);
+    explicit RedirectIOCommand(const char *cmd_line);
 
-    virtual ~RedirectionCommand() {
+    virtual ~RedirectIOCommand() {
     }
 
     void execute() override;
@@ -234,17 +236,6 @@ public:
     void execute() override;
 };
 
-class ForegroundCommand : public BuiltInCommand {
-    // TODO: Add your data members
-public:
-    ForegroundCommand(const char *cmd_line, JobsList *jobs);
-
-    virtual ~ForegroundCommand() {
-    }
-
-    void execute() override;
-};
-
 class ListDirCommand : public Command {
 public:
     ListDirCommand(const char *cmd_line);
@@ -256,6 +247,8 @@ public:
 };
 
 class WhoAmICommand : public Command {
+private:
+    std::string cmd_line;
 public:
     WhoAmICommand(const char *cmd_line);
 

@@ -8,6 +8,9 @@
 #include <iostream>
 #include <unistd.h>
 #include <cerrno>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <regex>
 
 using namespace std;
@@ -87,6 +90,15 @@ void _removeBackgroundSign(char *cmd_line) {
     cmd_line[idx] = ' ';
     // truncate the command line string up to the last non-space character
     cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
+}
+
+bool isRedirection(int numOfArgs, char** args) {                                 // find if redirection command
+  for (int i = 0; i < numOfArgs; i++) {
+    if (!strcmp(args[i], ">") || !strcmp(args[i], ">>")) {
+      return true;
+    }
+  }
+  return false;
 }
 
 string _getFirstArg(const char* cmd_line) {
@@ -679,13 +691,23 @@ const char* replaceAliased(const char *cmd_line, const map<std::string, std::str
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command *SmallShell::CreateCommand(const char *cmd_line) {
-    // For example:
+
+  char* args[COMMAND_MAX_ARGS];
+  string line = cmd_line;     //for some reason doesnt want to parse a const smh
+  int numOfArgs = _parseCommandLine(line.c_str(), args);
+  if (!numOfArgs) return nullptr;
+  bool redirectionCommand = isRedirection(numOfArgs, args);
+
   SmallShell &smash = SmallShell::getInstance();
   const char* cmd_s = replaceAliased(cmd_line, smash.aliasMap);
-  string firstWord = _getFirstArg(cmd_s);
 
+  string firstWord = args[0];                                           //it was already a string and its easy to use
+  _argsFree(numOfArgs, args);                                     //free the memory of its sins
 
-  if (firstWord.compare("alias") == 0) {
+  if (redirectionCommand) {                                             // check to see if IO command first
+    return new RedirectIOCommand(cmd_s);
+  }
+  else if (firstWord.compare("alias") == 0) {
     return new aliasCommand(cmd_s, smash.aliasMap, smash.builtInCommands);
   }
   else if (firstWord.compare("unalias") == 0) {
@@ -715,6 +737,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
   else if (firstWord.compare("kill") == 0) {
     return new KillCommand(cmd_s, this->jobs);
   }
+  else if (firstWord.compare("whoami") == 0) {
+    return new WhoAmICommand(cmd_s);
+  }
   else {
     return new ExternalCommand(cmd_s);
   }
@@ -723,13 +748,94 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
 }
 
 void SmallShell::executeCommand(const char *cmd_line) {
-    // TODO: Add your implementation here
-    // for example:
-    Command* cmd = CreateCommand(cmd_line);
-    cmd->execute();
-    // Please note that you must fork smash process for some commands (e.g., external commands....)
+  Command* cmd = CreateCommand(cmd_line);
+  if(cmd) cmd->execute();
 }
 
 void SmallShell::setCurrentDirectory(const std::string newDir){
   this->currPwd = newDir;
+}
+
+WhoAmICommand::WhoAmICommand(const char *cmd_line) : Command(cmd_line){
+  this->cmd_line = cmd_line;
+}
+void WhoAmICommand::execute() {
+  char *userEnv = getenv("USER");                       //contains username
+  if (!userEnv) {
+    perror("smash error: getenv failed");
+    return;
+  }
+  char *homeEnv = getenv("HOME");                       //contains home directory of usename
+  if (!homeEnv) {
+    perror("smash error: getenv failed");
+    return;
+  }
+  std::cout << userEnv << " " << homeEnv << std::endl;
+}
+
+RedirectIOCommand::RedirectIOCommand(const char *cmd_line) : Command(cmd_line){
+  this->cmd_line = cmd_line;
+}
+
+void RedirectIOCommand::execute() {
+
+  int i, fileFD;
+  char* args[COMMAND_MAX_ARGS + 1];
+  int numOfArgs = _parseCommandLine(this->cmd_line.c_str(), args);    // parse the command line
+  if (!numOfArgs) return;
+
+  for (i = 0; i < numOfArgs; i++) {                                   // find the index that contains the redirection symbol
+    if (!strcmp(args[i], ">") || !strcmp(args[i], ">>")) {
+      break;
+    }
+  }
+
+  string arrow = args[i], firstArg, thirdArg;
+
+  if (!arrow.compare(">>")) {                                         // open with seek pointer in the end
+    firstArg = _trim(this->cmd_line.substr(0, this->cmd_line.find_first_of(">>")));
+    thirdArg = _trim(this->cmd_line.substr(this->cmd_line.find_first_of(">>") + 2));   
+    fileFD = open(thirdArg.c_str(), O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
+  }
+  else {                                                              // open with seek pointer at the start
+    firstArg = _trim(this->cmd_line.substr(0, this->cmd_line.find_first_of(">")));
+    thirdArg = _trim(this->cmd_line.substr(this->cmd_line.find_first_of(">") + 2));   
+    fileFD = open(thirdArg.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+  }
+
+  _argsFree(numOfArgs, args);                                   // release that bitch
+
+  if (fileFD == -1) { // if no file me sad
+    perror("smash error: open failed");
+    return;
+  }
+
+  int oldSTDOUT = dup(STDOUT_FILENO);                             // duplicate the stdout file descriptor
+  if (oldSTDOUT == -1) { //if no stdout then how print before
+    perror("smash error: dup failed");
+    close(fileFD);
+    exit(EXIT_FAILURE);
+  }
+
+  if (dup2(fileFD, STDOUT_FILENO) == -1) {                        //change output redirection to the file
+    perror("smash error: dup2 failed");
+    close(fileFD);
+    exit(EXIT_FAILURE);
+  }
+
+  SmallShell::getInstance().executeCommand(firstArg.c_str());    //execute the command in the first argument 
+
+  if (dup2(oldSTDOUT, STDOUT_FILENO) == -1) {                    //change output redirection to stdout
+    perror("smash error: dup2 failed");
+    close(fileFD);
+    exit(EXIT_FAILURE);
+  }
+
+  if (close(fileFD) == -1) {                                      //close file descriptors
+    perror("smash error: close failed");
+  }
+    if (close(oldSTDOUT) == -1) {
+    perror("smash error: close failed");
+  }
+
 }
