@@ -616,8 +616,8 @@ void aliasCommand::execute(){
   }
   else{
     // find the name and the command
-    size_t start = this->newCommand.find_first_of("’");
-    size_t end = this->newCommand.find_last_not_of("’");
+    size_t start = this->newCommand.find_first_of("'");
+    size_t end = this->newCommand.find_last_not_of("'");
     std::string name,  command;
     if (start != std::string::npos && end != std::string::npos && start!=end){
       name = this->newCommand.substr(0, start-1); // end of name is (start-2)+1
