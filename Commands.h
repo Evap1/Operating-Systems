@@ -49,7 +49,8 @@ public:
 };
 
 class PipeCommand : public Command {
-    // TODO: Add your data members
+private:
+    std::string cmd_line;
 public:
     PipeCommand(const char *cmd_line);
 
