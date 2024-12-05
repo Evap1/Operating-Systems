@@ -101,6 +101,15 @@ bool isRedirection(int numOfArgs, char** args) {                                
   return false;
 }
 
+bool isPipe(int numOfArgs, char** args) {                                 // find if redirection command
+  for (int i = 0; i < numOfArgs; i++) {
+    if (!strcmp(args[i], "|") || !strcmp(args[i], "|&")) {
+      return true;
+    }
+  }
+  return false;
+}
+
 string _getFirstArg(const char* cmd_line) {
   string cmd_s = _trim(string(cmd_line));
   return cmd_s.substr(0, cmd_s.find_first_of(" \n"));
@@ -491,22 +500,20 @@ void ExternalCommand::execute() {
   if (pid == 0) {  // Child process
     setpgrp();
 
-    if(isInPATHEnvVar(args[0])) {           // check if in PATH environment
-      if (containsWildcards(args)) {
-        const char* bashPath = "/bin/bash";
-        const char* const bashArgs[] = {bashPath, "-c", (char*)cmd_line.c_str(), 0};
+      if (containsWildcards(args)) {  // Handle wildcards with bash
+      const char* bashPath = "/bin/bash";
+      const char* const bashArgs[] = {bashPath, "-c", this->cmd_line.c_str(), nullptr};
 
-        execv(bashPath, const_cast<char**>(bashArgs));
-        perror("smash error: execv failed");
-      }
-      else {
-        execvp(args[0], args);
-        perror("smash error: execvp failed");
-      }
+      execv(bashPath, const_cast<char**>(bashArgs));
+      perror("smash error: execv failed");
       exit(EXIT_FAILURE);
-    }
-    else {
-      exit(0);
+    } else if (isInPATHEnvVar(args[0])) {  // Handle commands in PATH
+      execvp(args[0], args);
+      perror("smash error: execvp failed");
+      exit(EXIT_FAILURE);
+    } else {
+      std::cerr << "smash error: command not found: " << args[0] << std::endl;
+      exit(EXIT_FAILURE);
     }
   }
   else if (!backgroundFlag){  // Parent process
@@ -727,7 +734,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
   string line = cmd_line;     //for some reason doesnt want to parse a const smh
   int numOfArgs = _parseCommandLine(line.c_str(), args);
   if (!numOfArgs) return nullptr;
+  
   bool redirectionCommand = isRedirection(numOfArgs, args);
+  bool pipeCommand = isPipe(numOfArgs, args);
 
   SmallShell &smash = SmallShell::getInstance();
   const char* cmd_s = replaceAliased(cmd_line, smash.aliasMap);
@@ -737,6 +746,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
 
   if (redirectionCommand) {                                             // check to see if IO command first
     return new RedirectIOCommand(cmd_s);
+  }
+  else if (pipeCommand) {
+    return new PipeCommand(cmd_s);
   }
   else if (firstWord.compare("alias") == 0) {
     return new aliasCommand(cmd_s, smash.aliasMap, smash.builtInCommands);
@@ -822,15 +834,13 @@ void RedirectIOCommand::execute() {
   }
 
   string arrow = args[i], firstArg, thirdArg;
+  firstArg = _trim(this->cmd_line.substr(0, this->cmd_line.find_first_of(arrow)));
+  thirdArg = _trim(this->cmd_line.substr(this->cmd_line.find_first_of(arrow) + arrow.length()));
 
-  if (!arrow.compare(">>")) {                                         // open with seek pointer in the end
-    firstArg = _trim(this->cmd_line.substr(0, this->cmd_line.find_first_of(">>")));
-    thirdArg = _trim(this->cmd_line.substr(this->cmd_line.find_first_of(">>") + 2));   
+  if (!arrow.compare(">>")) {                                         // open with seek pointer in the end  
     fileFD = open(thirdArg.c_str(), O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
   }
-  else {                                                              // open with seek pointer at the start
-    firstArg = _trim(this->cmd_line.substr(0, this->cmd_line.find_first_of(">")));
-    thirdArg = _trim(this->cmd_line.substr(this->cmd_line.find_first_of(">") + 2));   
+  else {                                                              // open with seek pointer at the start 
     fileFD = open(thirdArg.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
   }
 
@@ -869,4 +879,76 @@ void RedirectIOCommand::execute() {
     perror("smash error: close failed");
   }
 
+}
+
+PipeCommand::PipeCommand(const char *cmd_line) : Command(cmd_line){
+  this->cmd_line = cmd_line;
+}
+
+void PipeCommand::execute() {
+
+  int i;
+  char* args[COMMAND_MAX_ARGS + 1];
+  int numOfArgs = _parseCommandLine(this->cmd_line.c_str(), args);    // parse the command line
+  if (!numOfArgs) return;
+
+  for (i = 0; i < numOfArgs; i++) {                                   // find the index that contains the redirection symbol
+    if (!strcmp(args[i], "|") || !strcmp(args[i], "|&")) {
+      break;
+    }
+  }
+
+  string pipeType = args[i], firstCommand, secondCommand;
+  firstCommand = _trim(this->cmd_line.substr(0, this->cmd_line.find_first_of(pipeType)));
+  secondCommand = _trim(this->cmd_line.substr(this->cmd_line.find_first_of(pipeType) + pipeType.length()));
+
+  _argsFree(numOfArgs, args);                                   // release that bitch
+
+  int pipeFd[2];
+  if (pipe(pipeFd) == -1) {
+    perror("smash error: pipe failed");
+    return;
+  }
+
+  pid_t pid1 = fork();
+  if (pid1 == -1) {
+    perror("smash error: fork failed");
+    return;
+  }
+  
+  if (pid1 == 0) {
+    setpgrp();
+    // executes command1
+    close(pipeFd[0]);                 // Close read end
+    if (!pipeType.compare("|&")) {
+      dup2(pipeFd[1], STDERR_FILENO); // Redirect stderr
+    } else {
+      dup2(pipeFd[1], STDOUT_FILENO); // Redirect stdout
+    }
+    close(pipeFd[1]);
+    SmallShell::getInstance().executeCommand(firstCommand.c_str());
+    exit(EXIT_SUCCESS);
+  }
+
+  pid_t pid2 = fork();
+    if (pid2 == -1) {
+        perror("fork");
+        return;
+    }
+
+  if (pid2 == 0) {
+    setpgrp();
+    // executes command2
+    close(pipeFd[1]); // Close write end
+    dup2(pipeFd[0], STDIN_FILENO); // Redirect stdin
+    close(pipeFd[0]);
+    SmallShell::getInstance().executeCommand(secondCommand.c_str());
+    exit(EXIT_SUCCESS);
+  }
+  // father
+  close(pipeFd[0]);
+  close(pipeFd[1]);
+
+  waitpid(pid1, nullptr, 0);
+  waitpid(pid2, nullptr, 0);
 }
