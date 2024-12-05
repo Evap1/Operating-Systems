@@ -466,6 +466,7 @@ JobsList::JobEntry *SmallShell::tail()
 
 ExternalCommand::ExternalCommand(const char *cmd_line) : Command(cmd_line) {
   this->cmd_line = cmd_line;
+  this->cmd_line = _trim(this->cmd_line);
 }
 
 void ExternalCommand::execute() {
