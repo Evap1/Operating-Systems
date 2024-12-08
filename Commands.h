@@ -272,7 +272,7 @@ public:
 
 class aliasCommand : public BuiltInCommand {
 private:
-    std::string newCommand;
+    std::string cmd_line;
     std::map<std::string, std::string>& aliasMap;
     std::set<std::string>& builtInCommands;
 public:
