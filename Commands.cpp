@@ -627,76 +627,94 @@ void ChangeDirCommand::execute(){
 /**
 * aliasCommand
 */
-aliasCommand::aliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap,  std::set<std::string>& builtInCommands): 
+aliasCommand::aliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap,  std::set<std::string>& builtInCommands): BuiltInCommand(cmd_line),
+                                                                                                                                        cmd_line(cmd_line),
                                                                                                                                         aliasMap(aliasMap),
-                                                                                                                                        builtInCommands(builtInCommands), 
-                                                                                                                                        BuiltInCommand(cmd_line)
+                                                                                                                                        builtInCommands(builtInCommands)                                                                                       
 {
-  char* args[COMMAND_MAX_ARGS];
-  string line = cmd_line;
-  int numOfArgs = _parseCommandLine(line.c_str(), args);    // parse the command line
-  if (!numOfArgs) return;
 
-  this->newCommand = args[1] ? args[1]: "";
-  _argsFree(numOfArgs, args);
 }
 
+// tested
 void aliasCommand::execute(){
-  // only alias was in cmd -> print of aliased commands
-  if (strcmp(this->newCommand.c_str(), "") == 0){
-    for (const auto& alias : aliasMap) {
-      std::cout << alias.first << "='" << alias.second << "'" << std::endl;
-    }
+  char* args[COMMAND_MAX_ARGS+1];
+  int argCount = _parseCommandLine(this->cmd_line.c_str(), args);
+
+  bool temp = true;
+  // only alias was in cmd -> print all of aliased commands
+  if (argCount == 1){
+    // show content:
+    for (std::map<std::string, std::string>::iterator it=aliasMap.begin(); it!=aliasMap.end(); ++it)
+      std::cout << it->first << "='" << it->second << "'" << std::endl;
+      temp = false;
   }
-  else{
-    // find the name and the command
-    size_t start = this->newCommand.find_first_of("’");
-    size_t end = this->newCommand.find_last_not_of("’");
-    std::string name,  command;
-    if (start != std::string::npos && end != std::string::npos && start!=end){
-      name = this->newCommand.substr(0, start-1); // end of name is (start-2)+1
-      command = this->newCommand.substr(start, end+1);
-      // alias name conflicts with an existing alias or a reserved keyword
-      if(this->builtInCommands.find(name) != this->builtInCommands.end() || this->aliasMap.find(name) != this->aliasMap.end()){
-        std::cerr << "smash error: alias: "<< name <<" already exists or is a reserved command" << std::endl;
-        return;
-      }
-      // add to map the aliased name and command
-      else{
-        // validate the format and syntax
-        if (std::regex_match(name, std::regex("^[a-zA-Z0-9_]+$"))){
-          aliasMap[name] = command;
-        }
-        else{
-          std::cerr << "smash error: alias: invalid syntax" << std::endl;
-          return;
-        }
-      }
+
+  string clean_command = _trim(this->cmd_line);
+  // in substr: first argument is where to start and 2nd argument how many chars to read
+  std::string name = clean_command.substr(clean_command.find_first_of(" ") + 1, clean_command.find_first_of("=") - clean_command.find_first_of(" ") -1);
+  std::string command = clean_command.substr(clean_command.find_first_of("=") + 1 );
+  while(temp == true) {
+
+    if(clean_command.find_first_of("=") == string::npos){
+      std::cerr << "smash error: alias: invalid syntax =" << std::endl;
+      temp = false;
+      continue;
     }
-    // invalid syntax
+
+    // remove the first and last ' '
+    if (!command.empty() && command.front() == '\'') {
+        command.erase(command.begin());
+    }
+    else {
+      std::cerr << "smash error: alias: invalid syntax" << clean_command << std::endl;
+      temp = false;
+      continue;
+    }
+    if (!command.empty() && command.back() == '\'') {
+        command.pop_back();
+    }
     else{
-      std::cerr << "smash error: alias: invalid syntax" << std::endl;
-      return;
+      std::cerr << "smash error: alias: invalid syntax" << clean_command << std::endl;
+      temp = false;
+      continue;
     }
+
+    auto aliasCommand = this->aliasMap.find(name);
+    auto builtInCommand = this->builtInCommands.find(command);
+
+    // command already exists -> error
+    if (aliasCommand != this->aliasMap.end() || builtInCommand != this->builtInCommands.end()){
+        std::cerr << "smash error: alias: "<< name <<" already exists or is a reserved command" << std::endl;
+    }
+    // try to add to map
+    // validate the format and syntax
+    else if (std::regex_match(name, std::regex("^[a-zA-Z0-9_]+$"))){
+      this->aliasMap[name] = command;
+    }
+    else{
+      std::cerr << "smash error: alias: invalid syntax" <<std::endl;
+    }
+    temp = false;
+    continue;
   }
+  _argsFree(argCount, args);
 }
 
 /**
 * unaliasCommand
 */
 
-unaliasCommand::unaliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap): aliasMap(aliasMap), BuiltInCommand(cmd_line){
+unaliasCommand::unaliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap): BuiltInCommand(cmd_line),aliasMap(aliasMap){
   this->cmd_line = _trim(string(cmd_line));
 }
 
 void unaliasCommand::execute(){
   // format the cmd-line
-  char* args[COMMAND_MAX_ARGS];
+  char* args[COMMAND_MAX_ARGS+1];
   int argCount = _parseCommandLine(this->cmd_line.c_str(), args);
 
   if (argCount == 1){
     std::cerr << "smash error: unalias: not enough arguments" << std::endl;
-    return;
   }
   for( int i = 1; i<argCount; i++){
     // the name found
@@ -705,24 +723,36 @@ void unaliasCommand::execute(){
     }
     else{
       std::cerr << "smash error: unalias: "<< args[i] <<" alias does not exist" << std::endl;
-      return;
+      break;
     }
   }
   _argsFree(argCount, args);
 }
 
+//tested
 // returns converted cmd in case of aliased command. if not aliased - does nothing.
-const char* replaceAliased(const char *cmd_line, const map<std::string, std::string> map ){
-  string firstWord = _getFirstArg(cmd_line);
-  string cmd_s = _trim(string(cmd_line));
-  size_t firstSpace = cmd_s.find(' ');
+string replaceAliased(const char *cmd_line, const map<std::string, std::string> map ){
+    // format the cmd-line
+  char* args[COMMAND_MAX_ARGS + 1];
+  int argCount = _parseCommandLine(cmd_line, args);
 
-  if(map.find(firstWord) != map.end()){
-    string aliasedCommand = map.at(firstWord);
-    string args = (firstSpace == string::npos) ? "" : cmd_s.substr(firstSpace);
-    return (aliasedCommand + args).c_str();
+  if (argCount > 0) {
+    auto aliasCommand = map.find(args[0]);
+    // it is an alias command
+    if (aliasCommand != map.end()){
+      std::string replacedCommand = aliasCommand->second;
+      // append remaining arguments from cmd_line 
+      for (int i = 1; i < argCount; ++i) {
+          replacedCommand += " ";           
+          replacedCommand += args[i];
+      }
+      _argsFree(argCount, args);
+      return replacedCommand;
+    }
   }
-  return cmd_line;
+  // clean up and return original cmd_line
+  _argsFree(argCount, args);
+  return string(cmd_line);
 }
 
 /**
