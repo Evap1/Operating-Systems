@@ -759,17 +759,16 @@ string replaceAliased(const char *cmd_line, const map<std::string, std::string> 
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
 Command *SmallShell::CreateCommand(const char *cmd_line) {
-
+  SmallShell &smash = SmallShell::getInstance();
   char* args[COMMAND_MAX_ARGS];
-  string line = cmd_line;     //for some reason doesnt want to parse a const smh
+  string line = replaceAliased(cmd_line, smash.aliasMap);     //for some reason doesnt want to parse a const smh
   int numOfArgs = _parseCommandLine(line.c_str(), args);
   if (!numOfArgs) return nullptr;
   
   bool redirectionCommand = isRedirection(numOfArgs, args);
   bool pipeCommand = isPipe(numOfArgs, args);
 
-  SmallShell &smash = SmallShell::getInstance();
-  const char* cmd_s = replaceAliased(cmd_line, smash.aliasMap);
+  const char* cmd_s = line.c_str();
 
   string firstWord = args[0];                                           //it was already a string and its easy to use
   _argsFree(numOfArgs, args);                                     //free the memory of its sins

@@ -1,1 +1,21 @@
-smash> smash> smash> smash> smash> smash> smash: sending SIGKILL signal to 0 jobs:
+smash> smash> smash> a='sleep'
+ll='ls -l'
+smash> smash> ll='ls -l'
+smash> total 5792
+drwxr-xr-x 5 student student    4096 Nov 18 23:16 cmake-build-debug
+-rw-r--r-- 1 student student     155 Jan 25  2024 CMakeLists.txt
+-rw-rw-r-- 1 student student   27666 Dec  8 09:42 Commands.cpp
+-rw-rw-r-- 1 student student    6578 Dec  8 09:36 Commands.h
+-rw-rw-r-- 1 student student 3672288 Dec  8 09:45 Commands.o
+-rw-r--r-- 1 student student     886 Nov 28 11:31 Makefile
+-rw-r--r-- 1 student student    3057 Jan 26  2024 README.txt
+-rw-rw-r-- 1 student student     285 Nov 30 10:40 signals.cpp
+-rw-r--r-- 1 student student     113 Jun  9 08:02 signals.h
+-rw-rw-r-- 1 student student  105120 Nov 30 12:09 signals.o
+-rwxrwxr-x 1 student student 1982056 Dec  8 09:45 smash
+-rw-r--r-- 1 student student     532 Nov 28 14:16 smash.cpp
+-rw-rw-r-- 1 student student   86112 Nov 28 14:16 smash.o
+-rw-r--r-- 1 student student     104 Jan 25  2024 test_expected_output1.txt
+-rw-rw-r-- 1 student student      76 Dec  8 09:46 test_input1.txt
+-rw-rw-r-- 1 student student      74 Dec  8 09:46 test_output1.txt
+smash> smash> smash> smash> smash: sending SIGKILL signal to 0 jobs:
