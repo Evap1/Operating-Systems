@@ -6,7 +6,21 @@
 #include <map>
 #define COMMAND_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
-#define INVALID_PDIR ("-1");
+#define INVALID_PDIR ("-1")
+#define INVALID_DIR ("-1")
+#define DIR_BUF (1024)
+
+/**--------------------------------------------------------------------*/
+
+struct linux_dirent {
+    unsigned long d_ino;     
+    unsigned long d_off;     
+    unsigned short d_reclen; // length of this entry
+    char d_name[];           // start of the name (null-terminated)
+};
+
+/**--------------------------------------------------------------------*/
+
 class Command {
     // TODO: Add your data members
 private:
@@ -26,6 +40,12 @@ public:
     std::string getLine();
 };
 
+/**--------------------------------------------------------------------*/
+
+class JobsList; // used in a built in command, declared priorly
+
+/**--------------------------------------------------------------------*/
+
 class BuiltInCommand : public Command {
 private:
     std::string cmd_line;
@@ -35,6 +55,8 @@ public:
     virtual ~BuiltInCommand() {
     }
 };
+
+/**--------------------------------------------------------------------*/
 
 class ExternalCommand : public Command {
 private:
@@ -48,6 +70,8 @@ public:
     void execute() override;
 };
 
+/**--------------------------------------------------------------------*/
+
 class PipeCommand : public Command {
 private:
     std::string cmd_line;
@@ -59,6 +83,8 @@ public:
 
     void execute() override;
 };
+
+/**--------------------------------------------------------------------*/
 
 class RedirectIOCommand : public Command {
 private:
@@ -72,6 +98,54 @@ public:
 
     void execute() override;
 };
+
+/**--------------------------------------------------------------------*/
+
+class ListDirCommand : public Command {
+private:
+    std::string target_dir;
+
+    void listDirectory(int dir_fd, const std::string& path, int indent_level);
+
+public:
+    ListDirCommand(const char *cmd_line);
+
+    virtual ~ListDirCommand() {
+    }
+
+    void execute() override;
+};
+
+/**--------------------------------------------------------------------*/
+
+class WhoAmICommand : public Command {
+private:
+    std::string cmd_line;
+public:
+    WhoAmICommand(const char *cmd_line);
+
+    virtual ~WhoAmICommand() {
+    }
+
+    void execute() override;
+};
+
+/**--------------------------------------------------------------------*/
+
+class NetInfo : public Command {
+    // TODO: Add your data members
+public:
+    NetInfo(const char *cmd_line);
+
+    virtual ~NetInfo() {
+    }
+
+    void execute() override;
+};
+
+/**--------------------------------------------------------------------*/
+/**---------------------------BuiltInCommands--------------------------*/
+/**--------------------------------------------------------------------*/
 
 class ChangeDirCommand : public BuiltInCommand {
 private:
@@ -88,7 +162,7 @@ public:
     void execute() override;
 };
 
-
+/**--------------------------------------------------------------------*/
 
 class CHPromptCommand : public BuiltInCommand {
 private:
@@ -102,6 +176,8 @@ public:
     void execute() override;
 };
 
+/**--------------------------------------------------------------------*/
+
 class ShowPidCommand : public BuiltInCommand {
 private:
     int pid;
@@ -113,6 +189,8 @@ public:
 
     void execute() override;
 };
+
+/**--------------------------------------------------------------------*/
 
 class GetCurrDirCommand : public BuiltInCommand {
 private:
@@ -126,7 +204,7 @@ public:
     void execute() override;
 };
 
-class JobsList;
+/**--------------------------------------------------------------------*/
 
 class QuitCommand : public BuiltInCommand {
 private:
@@ -142,6 +220,8 @@ public:
     void execute() override;
 };
 
+/**--------------------------------------------------------------------*/
+
 class KillCommand : public BuiltInCommand {
     // TODO: Add your data members
     std::string cmd_line;
@@ -154,6 +234,70 @@ public:
 
     void execute() override;
 };
+
+/**--------------------------------------------------------------------*/
+
+class FGCommand : public BuiltInCommand {
+    // TODO: Add your data members
+    std::string cmd_line;
+public:
+    FGCommand(const char *cmd_line);
+
+    virtual ~FGCommand() {
+    }
+
+    void execute() override;
+};
+
+/**--------------------------------------------------------------------*/
+
+class aliasCommand : public BuiltInCommand {
+private:
+    std::string cmd_line;
+    std::map<std::string, std::string>& aliasMap;
+    std::set<std::string>& builtInCommands;
+public:
+    aliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap, std::set<std::string>& builtInCommands);
+
+    virtual ~aliasCommand() {
+    }
+
+    void execute() override;
+};
+
+/**--------------------------------------------------------------------*/
+
+class unaliasCommand : public BuiltInCommand {
+private:
+    std::string cmd_line;
+    std::map<std::string, std::string>& aliasMap;
+public:
+    unaliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap);
+
+    virtual ~unaliasCommand() {
+    }
+
+    void execute() override;
+};
+
+/**--------------------------------------------------------------------*/
+
+class JobsCommand : public BuiltInCommand {
+    // TODO: Add your data members
+    std::string cmd_line;
+    JobsList *jobs;
+public:
+    JobsCommand(const char *cmd_line, JobsList *jobs);
+
+    virtual ~JobsCommand() {
+    }
+
+    void execute() override;
+};
+
+/**--------------------------------------------------------------------*/
+/**---------------------------JobsListClass----------------------------*/
+/**--------------------------------------------------------------------*/
 
 class JobsList {
 public:
@@ -212,91 +356,9 @@ public:
     bool isEmpty();
 };
 
-class JobsCommand : public BuiltInCommand {
-    // TODO: Add your data members
-    std::string cmd_line;
-    JobsList *jobs;
-public:
-    JobsCommand(const char *cmd_line, JobsList *jobs);
-
-    virtual ~JobsCommand() {
-    }
-
-    void execute() override;
-};
-
-class FGCommand : public BuiltInCommand {
-    // TODO: Add your data members
-    std::string cmd_line;
-public:
-    FGCommand(const char *cmd_line);
-
-    virtual ~FGCommand() {
-    }
-
-    void execute() override;
-};
-
-class ListDirCommand : public Command {
-public:
-    ListDirCommand(const char *cmd_line);
-
-    virtual ~ListDirCommand() {
-    }
-
-    void execute() override;
-};
-
-class WhoAmICommand : public Command {
-private:
-    std::string cmd_line;
-public:
-    WhoAmICommand(const char *cmd_line);
-
-    virtual ~WhoAmICommand() {
-    }
-
-    void execute() override;
-};
-
-class NetInfo : public Command {
-    // TODO: Add your data members
-public:
-    NetInfo(const char *cmd_line);
-
-    virtual ~NetInfo() {
-    }
-
-    void execute() override;
-};
-
-class aliasCommand : public BuiltInCommand {
-private:
-    std::string cmd_line;
-    std::map<std::string, std::string>& aliasMap;
-    std::set<std::string>& builtInCommands;
-public:
-    aliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap, std::set<std::string>& builtInCommands);
-
-    virtual ~aliasCommand() {
-    }
-
-    void execute() override;
-};
-
-class unaliasCommand : public BuiltInCommand {
-private:
-    std::string cmd_line;
-    std::map<std::string, std::string>& aliasMap;
-public:
-    unaliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap);
-
-    virtual ~unaliasCommand() {
-    }
-
-    void execute() override;
-};
-
+/**--------------------------------------------------------------------*/
+/**---------------------------SmallShell-------------------------------*/
+/**--------------------------------------------------------------------*/
 
 class SmallShell {
 private:

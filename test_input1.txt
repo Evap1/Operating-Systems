@@ -1,10 +1,2 @@
-alias ll='ls -l'
-alias a='sleep'
-alias
-unalias a t ll
-alias
-ll
-
-
-
+listdir /home/student
 quit kill

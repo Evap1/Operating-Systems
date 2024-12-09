@@ -43,6 +43,10 @@
         "typeinfo": "cpp",
         "cstring": "cpp",
         "map": "cpp",
-        "set": "cpp"
-    }
+        "set": "cpp",
+        "bitset": "cpp",
+        "iterator": "cpp",
+        "regex": "cpp"
+    },
+    "C_Cpp.errorSquiggles": "disabled"
 }
