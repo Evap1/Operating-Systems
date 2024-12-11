@@ -14,7 +14,11 @@
 #include <algorithm>
 #include <dirent.h>
 #include <sys/syscall.h> 
-
+#include <sys/socket.h>
+#include <net/if.h>
+#include <arpa/inet.h>
+#include <sys/ioctl.h>
+#include <netinet/in.h>
 
 using namespace std;
 
@@ -67,8 +71,8 @@ string _trim(const std::string &s) {
 int _parseCommandLine(const char *cmd_line, char **args) {
     FUNC_ENTRY()
     int i = 0;
-    std::istringstream iss(_trim(string(cmd_line)).c_str());
-    for (std::string s; iss >> s;) {
+    std::istringstream line_steam(_trim(string(cmd_line)).c_str());
+    for (std::string s; line_steam >> s;) {
         args[i] = (char *) malloc(s.length() + 1);
         memset(args[i], 0, s.length() + 1);
         strcpy(args[i], s.c_str());
@@ -161,7 +165,7 @@ bool _isPositiveInteger(const std::string& str) {
 /**
 * verifies that the string starts with '-' followed by a numeric signal number. It also ensures the number is in the valid range [1, 32].
 */
-bool _isSingal(const std::string& str) {
+bool  line_steamingal(const std::string& str) {
   if (str.empty() || str.length() == 1) {
     return false;
   }
@@ -388,7 +392,7 @@ void KillCommand::execute() {
   
   //only 1-2 args or not valid numbers or not a valid signal
   if ((!secondArg.compare("") || !thirdArg.compare("")) &&
-      (_isSingal(secondArg) || !_isPositiveInteger(thirdArg))) {
+      ( line_steamingal(secondArg) || !_isPositiveInteger(thirdArg))) {
         std::cerr << "smash error: kill: invalid arguments" << std::endl;
     return;
   }
@@ -486,11 +490,13 @@ void ChangeDirCommand::execute(){
 }
 
 /**---------------------------aliasCommand---------------------------------*/
-// C'tor:
-aliasCommand::aliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap,  std::set<std::string>& builtInCommands): BuiltInCommand(cmd_line),
+// C'tor:    aliasCommand(const char *cmd_line, std::map<std::string, std::string>& alias_map, std::set<std::string>& built_in_commands, std::list<std::pair<std::string, std::string>>& alias_list);
+
+aliasCommand::aliasCommand(const char *cmd_line, std::map<std::string, std::string>& alias_map,  std::set<std::string>& built_in_commands, std::list<std::pair<std::string, std::string>>& alias_list): BuiltInCommand(cmd_line),
                                                                                                                                         cmd_line(cmd_line),
-                                                                                                                                        aliasMap(aliasMap),
-                                                                                                                                        builtInCommands(builtInCommands)                                                                                       
+                                                                                                                                        alias_map(alias_map),
+                                                                                                                                        built_in_commands(built_in_commands),
+                                                                                                                                        alias_list(alias_list)                                                                                       
 {
 
 }
@@ -503,8 +509,8 @@ void aliasCommand::execute(){
   // only alias was in cmd -> print all of aliased commands
   if (argCount == 1){
     // show content:
-    for (std::map<std::string, std::string>::iterator it=aliasMap.begin(); it!=aliasMap.end(); ++it)
-      std::cout << it->first << "='" << it->second << "'" << std::endl;
+    for (const auto& cur : alias_list)
+      std::cout << cur.first << "='" << cur.second << "'" << std::endl;
       temp = false;
   }
 
@@ -538,17 +544,18 @@ void aliasCommand::execute(){
       continue;
     }
 
-    auto aliasCommand = this->aliasMap.find(name);
-    auto builtInCommand = this->builtInCommands.find(command);
+    auto aliasCommand = this->alias_map.find(name);
+    auto builtInCommand = this->built_in_commands.find(command);
 
     // command already exists -> error
-    if (aliasCommand != this->aliasMap.end() || builtInCommand != this->builtInCommands.end()){
+    if (aliasCommand != this->alias_map.end() || builtInCommand != this->built_in_commands.end()){
         std::cerr << "smash error: alias: "<< name <<" already exists or is a reserved command" << std::endl;
     }
     // try to add to map
     // validate the format and syntax
     else if (std::regex_match(name, std::regex("^[a-zA-Z0-9_]+$"))){
-      this->aliasMap[name] = command;
+      this->alias_list.push_back({name, command});
+      this->alias_map[name] = command;
     }
     else{
       std::cerr << "smash error: alias: invalid syntax" <<std::endl;
@@ -561,7 +568,7 @@ void aliasCommand::execute(){
 
 /**---------------------------unaliasCommand---------------------------------*/
 // C'tor:
-unaliasCommand::unaliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap): BuiltInCommand(cmd_line),aliasMap(aliasMap){
+unaliasCommand::unaliasCommand(const char *cmd_line, std::map<std::string, std::string>& alias_map, std::list<std::pair<std::string, std::string>>& alias_list): BuiltInCommand(cmd_line),alias_map(alias_map), alias_list(alias_list){
   this->cmd_line = _trim(string(cmd_line));
 }
 
@@ -575,8 +582,16 @@ void unaliasCommand::execute(){
   }
   for( int i = 1; i<argCount; i++){
     // the name found
-    if(this->aliasMap.find(args[i]) != this->aliasMap.end()){
-      this->aliasMap.erase(args[i]);
+    if(this->alias_map.find(args[i]) != this->alias_map.end()){
+      std::string name = args[i];
+      // Remove the alias from the list
+      for (auto it = this->alias_list.begin(); it != this->alias_list.end(); ++it) {
+        if (it->first == name) {
+          this->alias_list.erase(it);
+          break;
+        }
+      }
+      this->alias_map.erase(name);
     }
     else{
       std::cerr << "smash error: unalias: "<< args[i] <<" alias does not exist" << std::endl;
@@ -610,6 +625,188 @@ string replaceAliased(const char *cmd_line, const map<std::string, std::string> 
   // clean up and return original cmd_line
   _argsFree(argCount, args);
   return string(cmd_line);
+}
+
+/**---------------------------NetInfoCommand---------------------------------*/
+// C'tor:
+NetInfo::NetInfo(const char *cmd_line) : Command(cmd_line), cmd_line(cmd_line){
+}
+
+void NetInfo::execute() {
+  char *args[COMMAND_MAX_ARGS];
+  int numOfArgs = _parseCommandLine(cmd_line.c_str(), args);
+  std::string interface;
+
+  if (numOfArgs < 2){
+    std::cerr << "smash error: netinfo: interface not specified" << std::endl;
+    _argsFree(numOfArgs, args);
+    return;
+  // TODO: what to do if more then one interface?
+  } 
+  else{
+    interface = args[1];
+  }
+  _argsFree(numOfArgs, args);
+
+  if(!isInterfaceValid(interface)){
+    return;
+  }
+
+  printIPSubnet(interface);
+  printDeafultGateway(interface);
+  printDNSServers();
+
+  return;
+}
+
+void NetInfo::printDeafultGateway(const std::string &interface){
+  char buffer[BUF];
+
+  int fd = open("/proc/net/route", O_RDONLY);
+  if (fd == -1) {
+    perror("smash error: open failed");
+    return;
+  }
+
+  ssize_t b_read = read(fd, buffer, BUF - 1);
+  if (b_read <= 0) {
+    perror("smash error: read failed");
+    close(fd);
+    return;
+  }
+
+  buffer[b_read] = '\0';
+
+  std::istringstream stream(buffer);
+  std::string line;
+
+  // reads each line from the string stream (stream) into the line string, looking for the deafult gateway.
+  while (std::getline(stream, line)) {
+    std::istringstream line_steam(line);
+    std::string interface_name, destination, gateway;
+
+    // pharse each line interface_name, dest, gateway 
+    if (!(line_steam >> interface_name >> destination >> gateway)){
+      continue;
+    }
+
+    if (interface_name == interface && destination == DEFAULT_GATEWAY_DEST) {
+      // convert to hexa from binary
+      unsigned int address = std::stoul(gateway, nullptr, 16);
+
+      struct in_addr gateway_addr;
+      gateway_addr.s_addr = address;
+
+      std::cout << "Default Gateway: " << inet_ntoa(gateway_addr) << std::endl;
+      break;
+    }
+  }
+  close(fd);
+}
+
+void NetInfo::printDNSServers(){
+  char buffer[BUF];
+
+  int fd = open("/etc/resolv.conf", O_RDONLY);
+  if (fd == -1) {
+    perror("smash error: open failed");
+    return;
+  }
+  ssize_t b_read = read(fd, buffer, BUF - 1);
+  if (b_read <= 0) {
+    perror("smash error: read failed");
+    close(fd);
+    return;
+  }
+
+  buffer[b_read] = '\0';
+
+  std::istringstream stream(buffer);
+  std::string line;
+
+  bool first = true;
+  // reads each line from the string stream (stream) into the line string, looking for the deafult gateway.
+  while (std::getline(stream, line)) {
+    if (line.find("nameserver") == 0) {
+      std::istringstream line_steam(line);
+      std::string token, dns;
+
+      if (line_steam >> token >> dns) {
+        if (first) {
+          std::cout << "DNS Servers: ";
+        }
+        if (!first) {
+          std::cout << ", ";
+        }
+        std::cout << dns;
+        first = false;
+      }
+    }
+  }
+  std::cout << "\n";
+
+  close(fd);
+}
+
+
+void NetInfo::printIPSubnet(const std::string &interface){
+  int sock = socket(AF_INET, SOCK_DGRAM, 0);
+  if (sock < 0) {
+  perror("smash error: socket failed");
+    return;
+  } 
+  struct ifreq inf;     // holds interface_namermation about the network interface
+
+  strncpy(inf.ifr_name, interface.c_str(), IFNAMSIZ - 1);     // copy without buffer overflow the provided ibterface name
+  
+  // queries the IP address of the specified interface
+  if (ioctl(sock, SIOCGIFADDR, &inf) == 0) {
+    struct sockaddr_in *ip = (struct sockaddr_in *)&inf.ifr_addr;
+    // convert the IP address from binary to a string.
+    std::cout << "IP Address: " << inet_ntoa(ip->sin_addr) << std::endl;
+  }
+  else{
+    perror("smash error: ioctl failed");
+  }
+
+  // queries the subnet mask address of the specified interface
+  if (ioctl(sock, SIOCGIFNETMASK, &inf) == 0) {
+    struct sockaddr_in *mask = (struct sockaddr_in *)&inf.ifr_netmask;
+    std::cout << "Subnet Mask: " << inet_ntoa(mask->sin_addr) << std::endl;
+  }
+  else{
+    perror("smash error: ioctl failed");
+  }
+  close(sock);
+}
+
+// return true if the provided interfacde name is valid.
+bool NetInfo::isInterfaceValid(const std::string &interface) {
+  // create new socket, used for communication with the network stack to retrieve interface_namermation about network interfaces.
+  int sock = socket(AF_INET, SOCK_DGRAM, 0);    // AF_INET is the address family for IPv4, SOCK_DGRAM is the socket type as datagram-based
+  if (sock < 0) {
+    perror("smash error: socket failed");
+        return false;
+  }    
+  struct ifreq inf;     // holds interface_namermation about the network interface
+
+  strncpy(inf.ifr_name, interface.c_str(), IFNAMSIZ - 1);     // copy without buffer overflow the provided ibterface name
+
+  // check if the interface is valid using
+  // ioctl system call retrieves the IP address of the specified network interface. 0 in case of success.
+  if (ioctl(sock, SIOCGIFADDR, &inf) < 0){
+    // ENODEV is an error code indicating "No such device," meaning the specified network interface does not exist.
+    if (errno == ENODEV){ 
+      std::cerr << "smash error: netinfo: interface " << interface << " does not exist" << std::endl;
+    } 
+    else{
+      perror("smash error: ioctl failed");
+    }
+    close(sock);
+    return false;
+  }
+  close(sock);
+  return true;
 }
 
 /**---------------------------ExternalCommand---------------------------------*/
@@ -724,13 +921,13 @@ void ListDirCommand::execute() {
 *  - If more than one argument is provided "smash error: listdir: too many arguments"
 */
 void ListDirCommand::listDirectory(int dir_fd, const std::string& path, int indent_level) {
-    char buffer[DIR_BUF];
+    char buffer[BUF];
     struct stat entry_stat;     // metadata about a file or directory.
     std::vector<std::string> dirs;
     std::vector<std::string> files;
 
     int num_read = 0; 
-    while ((num_read = syscall(SYS_getdents, dir_fd, buffer, DIR_BUF)) > 0) {
+    while ((num_read = syscall(SYS_getdents, dir_fd, buffer, BUF)) > 0) {
         for (int current = 0; current < num_read;) {
             // buffer + current points to the start of the current directory entry
             struct linux_dirent *dirent = (struct linux_dirent *)(buffer + current); 
@@ -964,7 +1161,7 @@ SmallShell::SmallShell() {
   this->promptName = "smash> ";
   this->currPwd = getcwd(nullptr, 0);
   this->lastPwd = "-1";
-  this->builtInCommands = {"alias", "unalias", "chprompt", "showpid", "pwd", "cd", "jobs", "fg", "quit", "kill"};
+  this->built_in_commands = {"alias", "unalias", "chprompt", "showpid", "pwd", "cd", "jobs", "fg", "quit", "kill"};
   this->jobs = new JobsList();
 }
 
@@ -1010,7 +1207,7 @@ JobsList::JobEntry *SmallShell::tail()
 Command *SmallShell::CreateCommand(const char *cmd_line) {
   SmallShell &smash = SmallShell::getInstance();
   char* args[COMMAND_MAX_ARGS];
-  string line = replaceAliased(cmd_line, smash.aliasMap);     //for some reason doesnt want to parse a const smh
+  string line = replaceAliased(cmd_line, smash.alias_map);     //for some reason doesnt want to parse a const smh
   int numOfArgs = _parseCommandLine(line.c_str(), args);
   if (!numOfArgs) return nullptr;
   
@@ -1029,10 +1226,10 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     return new PipeCommand(cmd_s);
   }
   else if (firstWord.compare("alias") == 0) {
-    return new aliasCommand(cmd_s, smash.aliasMap, smash.builtInCommands);
+    return new aliasCommand(cmd_s, smash.alias_map, smash.built_in_commands, smash.alias_list);
   }
   else if (firstWord.compare("unalias") == 0) {
-    return new unaliasCommand(cmd_s, smash.aliasMap);
+    return new unaliasCommand(cmd_s, smash.alias_map, smash.alias_list);
   }
   else if (firstWord.compare("chprompt") == 0) { 
     return new CHPromptCommand(cmd_s);
@@ -1063,6 +1260,9 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
   }
    else if (firstWord.compare("listdir") == 0) {
     return new ListDirCommand(cmd_s);
+  }
+  else if (firstWord.compare("netinfo") == 0) {
+    return new NetInfo(cmd_s);
   }
   else {
     return new ExternalCommand(cmd_s);

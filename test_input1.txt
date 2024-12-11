@@ -1,2 +1,7 @@
-listdir /home/student
+alias s='sleep'
+alias ll='ls -l'
+alias a='ctd'
+unalias ll t s
+alias
+netinfo enp0s1
 quit kill

@@ -4,11 +4,14 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <list>
 #define COMMAND_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 #define INVALID_PDIR ("-1")
 #define INVALID_DIR ("-1")
-#define DIR_BUF (1024)
+#define INVALID ("-1")
+#define BUF (4096)
+#define DEFAULT_GATEWAY_DEST "00000000"
 
 /**--------------------------------------------------------------------*/
 
@@ -133,7 +136,17 @@ public:
 /**--------------------------------------------------------------------*/
 
 class NetInfo : public Command {
-    // TODO: Add your data members
+private:
+    std::string cmd_line;
+
+    bool isInterfaceValid(const std::string &interface);
+
+    void printIPSubnet(const std::string &interface);
+
+    void printDeafultGateway(const std::string &interface);
+
+    void printDNSServers();
+
 public:
     NetInfo(const char *cmd_line);
 
@@ -254,10 +267,12 @@ public:
 class aliasCommand : public BuiltInCommand {
 private:
     std::string cmd_line;
-    std::map<std::string, std::string>& aliasMap;
-    std::set<std::string>& builtInCommands;
+    std::map<std::string, std::string>& alias_map;
+    std::set<std::string>& built_in_commands;
+    std::list<std::pair<std::string, std::string>>& alias_list;
+
 public:
-    aliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap, std::set<std::string>& builtInCommands);
+    aliasCommand(const char *cmd_line, std::map<std::string, std::string>& alias_map, std::set<std::string>& built_in_commands, std::list<std::pair<std::string, std::string>>& alias_list);
 
     virtual ~aliasCommand() {
     }
@@ -270,9 +285,10 @@ public:
 class unaliasCommand : public BuiltInCommand {
 private:
     std::string cmd_line;
-    std::map<std::string, std::string>& aliasMap;
+    std::map<std::string, std::string>& alias_map;
+    std::list<std::pair<std::string, std::string>>& alias_list;
 public:
-    unaliasCommand(const char *cmd_line, std::map<std::string, std::string>& aliasMap);
+    unaliasCommand(const char *cmd_line, std::map<std::string, std::string>& alias_map, std::list<std::pair<std::string, std::string>>& alias_list);
 
     virtual ~unaliasCommand() {
     }
@@ -370,8 +386,9 @@ private:
     SmallShell();
 
 public:
-    std::set<std::string> builtInCommands;
-    std::map<std::string, std::string> aliasMap;
+    std::set<std::string> built_in_commands;
+    std::map<std::string, std::string> alias_map;
+    std::list<std::pair<std::string, std::string>> alias_list;
     std::string lastPwd;
     Command *CreateCommand(const char *cmd_line);
 
