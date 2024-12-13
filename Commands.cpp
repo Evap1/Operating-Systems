@@ -311,16 +311,16 @@ void FGCommand::execute() {
   string thirdArg = args[2] ? args[2] : "";
   _argsFree(numOfArgs, args);
 
-  if (!thirdArg.empty()) {
+  if (thirdArg.empty()) {
     std::cerr << "smash error: fg: invalid arguments" << std::endl;
     return;
-  }
-  else if (jobID.compare("") && _isPositiveInteger(jobID)) { // need to check for third argument
-    ID =  stoi(jobID);
   }
   else if (SmallShell::getInstance().getJobs()->isEmpty()){
     std::cerr << "smash error: fg: jobs list is empty" << std::endl;
     return;
+  }
+  else if (jobID.compare("") && _isPositiveInteger(jobID)) { // need to check for third argument
+    ID =  stoi(jobID);
   }
   else {
     ID = SmallShell::getInstance().getJobs()->getLastJobID();
@@ -509,9 +509,10 @@ void aliasCommand::execute(){
   // only alias was in cmd -> print all of aliased commands
   if (argCount == 1){
     // show content:
-    for (const auto& cur : alias_list)
+    for (const auto& cur : alias_list){
       std::cout << cur.first << "='" << cur.second << "'" << std::endl;
-      temp = false;
+    }
+    temp = false;
   }
 
   string clean_command = _trim(this->cmd_line);
