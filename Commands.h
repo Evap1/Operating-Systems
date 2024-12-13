@@ -12,7 +12,7 @@
 #define INVALID ("-1")
 #define BUF (4096)
 #define DEFAULT_GATEWAY_DEST "00000000"
-
+#define INITIAL_FG (-1)
 /**--------------------------------------------------------------------*/
 
 struct linux_dirent {
@@ -382,6 +382,7 @@ private:
     std::string promptName;
     std::string currPwd;
     JobsList* jobs;
+    pid_t fg_pid;
 
     SmallShell();
 
@@ -420,6 +421,10 @@ public:
     JobsList::JobEntry* tail();
 
     JobsList* getJobs();
+
+    void setFGPID(pid_t pid);
+
+    pid_t getFGPID();
 };
 
 #endif //SMASH_COMMAND_H_

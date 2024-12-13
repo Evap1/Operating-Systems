@@ -17,6 +17,7 @@ int main(int argc, char *argv[]) {
         std::string cmd_line;
         std::getline(std::cin, cmd_line);
         smash.executeCommand(cmd_line.c_str());
+        std::fflush(stdout);
     }
     return 0;
 }
