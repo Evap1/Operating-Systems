@@ -236,70 +236,6 @@ string isSimpleInDirectoryExe(const char* arg) {
 }
 
 /**
-* searches for the given command (arg) in all the current directory and its sub directories recurssivly
-*/
-string findExecutableInCurrentDir(const string& dirPath, const string& target) {
-
-  // If the target is already a full path, return it directly
-  if (target[0] == '/') {
-    struct stat st;
-    if (stat(target.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
-      return target;  // Found the exact file at the path
-    }
-    return "";  // The file does not exist at the provided path
-  }
-
-  int fd = open(dirPath.c_str(), O_RDONLY | O_DIRECTORY);
-  if (fd == -1) {
-    perror(("Failed to open directory: " + dirPath).c_str());
-    return "";
-  }
-
-  char buffer[BUF_SIZE];
-  struct linux_dirent* d;
-  int nread;
-
-  while ((nread = syscall(SYS_getdents, fd, buffer, BUF_SIZE)) > 0) {
-    for (int bpos = 0; bpos < nread;) {
-      d = (struct linux_dirent*) (buffer + bpos);
-      string entryName = d->d_name;
-
-      // Skip "." and ".."
-      if (entryName == "." || entryName == "..") {
-        bpos += d->d_reclen;
-        continue;
-      }
-      // Construct the full path of the entry
-      string fullPath = dirPath + "/" + entryName;
-      // Check if the entry matches the target
-      if (entryName == target) {
-        close(fd);
-        return fullPath;  // Found the executable file
-      }
-
-      // Check if the entry is a directory
-      struct stat st;
-      if (fstatat(fd, entryName.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISDIR(st.st_mode)) {
-        // Recursively search in subdirectories
-        string result = findExecutableInCurrentDir(fullPath, target);
-        if (!result.empty()) {
-          close(fd);  // Close the current directory before returning
-          return result;  // Return the found path
-        }
-      }
-        bpos += d->d_reclen;
-    }
-  }
-
-  if (nread == -1) {
-    perror(("Failed to read directory entries in: " + dirPath).c_str());
-  }
-
-  close(fd);
-  return "";  // Return an empty string if not found
-}
-
-/**
 * Iterates through the arguments and checks for the presence of wildcard characters, which are commonly used in shell commands.
 */
 bool containsWildcards(char** args) {
@@ -991,9 +927,8 @@ void ExternalCommand::execute() {
       exit(EXIT_FAILURE);
     }
     else if(!target.empty()) {           //found a command that looks like an executable - check in directory or sub directories 
-      string path = findExecutableInCurrentDir(".", target);
-      if (!path.empty()) {
-        execv(path.c_str(), args);
+      if (!target.empty()) {
+        execv(target.c_str(), args);
         perror("smash error: execv failed");
         exit(EXIT_FAILURE);
       }
