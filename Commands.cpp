@@ -22,7 +22,7 @@
 
 using namespace std;
 
-const std::string WHITESPACE = " \n\r\t\f\v";
+const string WHITESPACE = " \n\r\t\f\v";
 
 #if 0
 #define FUNC_ENTRY()  \
@@ -38,24 +38,24 @@ const std::string WHITESPACE = " \n\r\t\f\v";
 /**
 * Finds the first non-whitespace character in the string and returns a substring starting from that character to the end.
 */
-string _ltrim(const std::string &s) {
+string _ltrim(const string &s) {
     size_t start = s.find_first_not_of(WHITESPACE);
-    return (start == std::string::npos) ? "" : s.substr(start);
+    return (start == string::npos) ? "" : s.substr(start);
 }
 
 /**
 * Finds the last non-whitespace character in the string and returns a substring from the start to that character (inclusive).
 */
-string _rtrim(const std::string &s) {
+string _rtrim(const string &s) {
     size_t end = s.find_last_not_of(WHITESPACE);
-    return (end == std::string::npos) ? "" : s.substr(0, end + 1);
+    return (end == string::npos) ? "" : s.substr(0, end + 1);
 }
 
 /**
 * Uses _ltrim and _rtrim to remove whitespace at the start and end of the string, respectively.
-* @return std::string - new string with both leading and trailing whitespace removed.
+* @return string - new string with both leading and trailing whitespace removed.
 */
-string _trim(const std::string &s) {
+string _trim(const string &s) {
     return _rtrim(_ltrim(s));
 }
 
@@ -71,8 +71,8 @@ string _trim(const std::string &s) {
 int _parseCommandLine(const char *cmd_line, char **args) {
     FUNC_ENTRY()
     int i = 0;
-    std::istringstream line_steam(_trim(string(cmd_line)).c_str());
-    for (std::string s; line_steam >> s;) {
+    istringstream line_steam(_trim(string(cmd_line)).c_str());
+    for (string s; line_steam >> s;) {
         args[i] = (char *) malloc(s.length() + 1);
         memset(args[i], 0, s.length() + 1);
         strcpy(args[i], s.c_str());
@@ -125,33 +125,43 @@ void _removeBackgroundSign(char *cmd_line) {
 }
 
 /**
-* iterates over the arguments to determine if the command involves output redirection using the '>' or '>>' symbols.
+* check to see if the string contains ">" or ">>"
 */
-bool isRedirection(int numOfArgs, char** args) {                                
-  for (int i = 0; i < numOfArgs; i++) {
-    if (!strcmp(args[i], ">") || !strcmp(args[i], ">>")) {
-      return true;
+pair<bool, tuple<string, size_t>> isRedirection(const string& cmd) {                                
+    size_t pos = cmd.find(">>");                                            // Search for ">>" in string
+    if (pos != string::npos) {
+      return make_pair(true, make_tuple(">>", pos));
     }
-  }
-  return false;
+
+    pos = cmd.find(">");                                                    // Search for ">" if ">>" wasn't found
+    if (pos != string::npos) {
+      return make_pair(true, make_tuple(">", pos));
+    }
+
+    return make_pair(false, make_tuple("", string::npos));                        // No redirection found
 }
 
 /**
 * Iterates over the arguments to determine if the command involves piping using the '|' or '|&' symbols.
 */
-bool isPipe(int numOfArgs, char** args) {                                 
-  for (int i = 0; i < numOfArgs; i++) {
-    if (!strcmp(args[i], "|") || !strcmp(args[i], "|&")) {
-      return true;
+pair<bool, tuple<string, size_t>> isPipe(const string& cmd) {                                 
+  size_t pos = cmd.find("|&");                                            // Search for "|&" in string
+    if (pos != string::npos) {
+      return make_pair(true, make_tuple("|&", pos));
     }
-  }
-  return false;
+
+    pos = cmd.find("|");                                                    // Search for "|" if "|&" wasn't found
+    if (pos != string::npos) {
+      return make_pair(true, make_tuple("|", pos));
+    }
+
+    return make_pair(false, make_tuple("", string::npos));                        // No redirection found
 }
 
 /**
 * verifies if the input string contains only numeric characters and is not empty.
 */
-bool _isPositiveInteger(const std::string& str) {
+bool _isPositiveInteger(const string& str) {
     if (str.empty()) return false;
 
     for (char c : str) {
@@ -165,7 +175,7 @@ bool _isPositiveInteger(const std::string& str) {
 /**
 * verifies that the string starts with '-' followed by a numeric signal number. It also ensures the number is in the valid range [1, 32].
 */
-bool  _isValidSignal(const std::string& str) {
+bool  _isValidSignal(const string& str) {
   if (str.empty() || str.length() == 1) {
     return false;
   }
@@ -198,12 +208,12 @@ bool isInPATHEnvVar(const char* arg) {
     return false;
   }
 
-  std::istringstream pathStream(pathEnv);
-  std::string pathDir;
+  istringstream pathStream(pathEnv);
+  string pathDir;
 
-  while (std::getline(pathStream, pathDir, ':')) {
+  while (getline(pathStream, pathDir, ':')) {
     
-    std::string full_path = pathDir + "/" + arg;    // construct the full path to the command
+    string full_path = pathDir + "/" + arg;    // construct the full path to the command
     if (access(full_path.c_str(), X_OK) == 0) {     // check if the file exists and is executable
       return true;
     }
@@ -212,13 +222,15 @@ bool isInPATHEnvVar(const char* arg) {
 }
 
 /**
-* check if the argument starts with "./" (simple exe)
+* check if the argument starts with "./" or "../" (simple exe/ exe in parent folder)
 */
 string isSimpleInDirectoryExe(const char* arg) {
-  string ptr = arg;
-  ptr = _trim(ptr);
+  string ptr = _trim(string(arg));
   if (ptr.rfind("./", 0) == 0) {
     return ptr.substr(2);
+  }
+  else if (ptr.rfind("../", 0) == 0) {          // check if in parent folder
+    return ptr.substr(3);
   }
   return "";
 }
@@ -226,58 +238,65 @@ string isSimpleInDirectoryExe(const char* arg) {
 /**
 * searches for the given command (arg) in all the current directory and its sub directories recurssivly
 */
-std::string findExecutableInCurrentDir(const std::string& dirPath, const std::string& target) {
-    int fd = open(dirPath.c_str(), O_RDONLY | O_DIRECTORY);
-    if (fd == -1) {
-        perror(("Failed to open directory: " + dirPath).c_str());
-        return "";
+string findExecutableInCurrentDir(const string& dirPath, const string& target) {
+
+  // If the target is already a full path, return it directly
+  if (target[0] == '/') {
+    struct stat st;
+    if (stat(target.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
+      return target;  // Found the exact file at the path
     }
+    return "";  // The file does not exist at the provided path
+  }
 
-    char buffer[BUF_SIZE];
-    struct linux_dirent* d;
-    int nread;
+  int fd = open(dirPath.c_str(), O_RDONLY | O_DIRECTORY);
+  if (fd == -1) {
+    perror(("Failed to open directory: " + dirPath).c_str());
+    return "";
+  }
 
-    while ((nread = syscall(SYS_getdents, fd, buffer, BUF_SIZE)) > 0) {
-        for (int bpos = 0; bpos < nread;) {
-            d = (struct linux_dirent*) (buffer + bpos);
-            std::string entryName = d->d_name;
+  char buffer[BUF_SIZE];
+  struct linux_dirent* d;
+  int nread;
 
-            // Skip "." and ".."
-            if (entryName == "." || entryName == "..") {
-                bpos += d->d_reclen;
-                continue;
-            }
+  while ((nread = syscall(SYS_getdents, fd, buffer, BUF_SIZE)) > 0) {
+    for (int bpos = 0; bpos < nread;) {
+      d = (struct linux_dirent*) (buffer + bpos);
+      string entryName = d->d_name;
 
-            // Construct the full path of the entry
-            std::string fullPath = dirPath + "/" + entryName;
+      // Skip "." and ".."
+      if (entryName == "." || entryName == "..") {
+        bpos += d->d_reclen;
+        continue;
+      }
+      // Construct the full path of the entry
+      string fullPath = dirPath + "/" + entryName;
+      // Check if the entry matches the target
+      if (entryName == target) {
+        close(fd);
+        return fullPath;  // Found the executable file
+      }
 
-            // Check if the entry matches the target
-            if (entryName == target) {
-                close(fd);
-                return fullPath;  // Found the executable file
-            }
-
-            // Check if the entry is a directory
-            struct stat st;
-            if (fstatat(fd, entryName.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISDIR(st.st_mode)) {
-                // Recursively search in subdirectories
-                std::string result = findExecutableInCurrentDir(fullPath, target);
-                if (!result.empty()) {
-                    close(fd);  // Close the current directory before returning
-                    return result;  // Return the found path
-                }
-            }
-
-            bpos += d->d_reclen;
+      // Check if the entry is a directory
+      struct stat st;
+      if (fstatat(fd, entryName.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISDIR(st.st_mode)) {
+        // Recursively search in subdirectories
+        string result = findExecutableInCurrentDir(fullPath, target);
+        if (!result.empty()) {
+          close(fd);  // Close the current directory before returning
+          return result;  // Return the found path
         }
+      }
+        bpos += d->d_reclen;
     }
+  }
 
-    if (nread == -1) {
-        perror(("Failed to read directory entries in: " + dirPath).c_str());
-    }
+  if (nread == -1) {
+    perror(("Failed to read directory entries in: " + dirPath).c_str());
+  }
 
-    close(fd);
-    return "";  // Return an empty string if not found
+  close(fd);
+  return "";  // Return an empty string if not found
 }
 
 /**
@@ -299,7 +318,7 @@ Command::Command(const char *cmd_line){
   this->cmd_line = cmd_line;
 }
 
-std::string Command::getLine(){
+string Command::getLine(){
     return this->cmd_line;
 }
 
@@ -337,7 +356,7 @@ GetCurrDirCommand::GetCurrDirCommand(const char *cmd_line) : BuiltInCommand(cmd_
 }
 
 void GetCurrDirCommand::execute() {
-  std::cout << SmallShell::getInstance().getCurrentDirectory() << std::endl;
+  cout << SmallShell::getInstance().getCurrentDirectory() << endl;
 }
 
 /**---------------------------JobsCommand--------------------------------*/
@@ -367,7 +386,7 @@ void FGCommand::execute() {
 
   // 1 - fg , 2 - num , 3 - invalid
   if(numOfArgs > 2 ){
-    std::cerr << "smash error: fg: invalid arguments" << std::endl;
+    cerr << "smash error: fg: invalid arguments" << endl;
     _argsFree(numOfArgs, args);
     return;
   }
@@ -379,13 +398,13 @@ void FGCommand::execute() {
       id = stoi(job_id);
       job = smash.getJobs()->getJobById(id);
       if (!job){
-        std::cerr << "smash error: fg: job-id " << id << " does not exist" << std::endl;
+        cerr << "smash error: fg: job-id " << id << " does not exist" << endl;
         _argsFree(numOfArgs, args);
         return;
       }
     }
     else{
-      std::cerr << "smash error: fg: invalid arguments" << std::endl;
+      cerr << "smash error: fg: invalid arguments" << endl;
       _argsFree(numOfArgs, args);
       return;
     }
@@ -396,12 +415,12 @@ void FGCommand::execute() {
   if (numOfArgs == 1){
     job = smash.getJobs()->getLastJob(&id);
     if (!job){
-      std::cerr << "smash error: fg: jobs list is empty" << std::endl;
+      cerr << "smash error: fg: jobs list is empty" << endl;
       return;
     }
   }
   // print the found job
-  std::cout << job->getCommandLine() << " " << job->getPID() << std::endl;
+  cout << job->getCommandLine() << " " << job->getPID() << endl;
   job->isActive = false;
   smash.setFGPID(job->getPID());
   waitpid(job->getPID(), NULL, 0);
@@ -430,10 +449,10 @@ void QuitCommand::execute() {
   _argsFree(numOfArgs, args);
   
   if (!secondArg.compare("kill")) {
-    std::cout << "smash: sending SIGKILL signal to " << jobs->jobs.size() << " jobs:" << std::endl;
+    cout << "smash: sending SIGKILL signal to " << jobs->jobs.size() << " jobs:" << endl;
 
     for (auto it = jobs->jobs.begin(); it != jobs->jobs.end();) {
-      std::cout << it->getPID() << ": " << it->getCommandLine() << std::endl;
+      cout << it->getPID() << ": " << it->getCommandLine() << endl;
       if (kill(it->getPID(), SIGKILL) == -1) {
         perror("smash error: kill failed");
         continue;
@@ -466,19 +485,19 @@ KillCommand::KillCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(
 //   //only 1-2 args or not valid numbers or not a valid signal
 //   if ((!secondArg.compare("") || !thirdArg.compare("")) &&
 //       ( _isValidSignal(secondArg) || !_isPositiveInteger(thirdArg))) {
-//         std::cerr << "smash error: kill: invalid arguments" << std::endl;
+//         cerr << "smash error: kill: invalid arguments" << endl;
 //     return;
 //   }
 //   int ID = stoi(thirdArg);
 //   JobsList::JobEntry* job = jobs->getJobById(ID);
 
 //   if (!job) {
-//     std::cerr << "smash error: kill: job-id " << ID << " does not exist" << std::endl;
+//     cerr << "smash error: kill: job-id " << ID << " does not exist" << endl;
 //     return;
 //   }
 //   //need to kill job when adding the function
 //   int signal = abs(stoi(secondArg));
-//   std::cout << "signal number " << signal <<" was sent to pid " << job->getPID() << std::endl;
+//   cout << "signal number " << signal <<" was sent to pid " << job->getPID() << endl;
 //   kill(job->getPID(), signal);
 
 //   if (signal == SIGKILL) {
@@ -499,13 +518,13 @@ void KillCommand::execute() {
 
   // validate format
   if (numOfArgs != 3 ){
-    std::cerr << "smash error: kill: invalid arguments" << std::endl;
+    cerr << "smash error: kill: invalid arguments" << endl;
     _argsFree(numOfArgs, args);
     return;
   }
   // valid signum and positive job-id
   else if(!_isValidSignal(args[1]) || !_isPositiveInteger(args[2])){
-    std::cerr << "smash error: kill: invalid arguments" << std::endl;
+    cerr << "smash error: kill: invalid arguments" << endl;
     _argsFree(numOfArgs, args);
     return;
   }
@@ -515,7 +534,7 @@ void KillCommand::execute() {
   JobsList::JobEntry* job = jobs->getJobById(job_id);
 
   if (!job) { // job doesnt exist
-    std::cerr << "smash error: kill: job-id " << job_id << " does not exist" << std::endl;
+    cerr << "smash error: kill: job-id " << job_id << " does not exist" << endl;
     _argsFree(numOfArgs, args);
     return;
   }
@@ -525,7 +544,7 @@ void KillCommand::execute() {
     _argsFree(numOfArgs, args);
     return;
   }
-  std::cout << "signal number " << signal <<" was sent to pid " << job->getPID() << std::endl;
+  cout << "signal number " << signal <<" was sent to pid " << job->getPID() << endl;
 
   jobs->removeFinishedJobs();           //if did not fail
   
@@ -540,7 +559,7 @@ ShowPidCommand::ShowPidCommand(const char *cmd_line) : BuiltInCommand(cmd_line) 
 }
 
 void ShowPidCommand::execute() {
-  std::cout << "smash pid is " << this->pid << std::endl;
+  cout << "smash pid is " << this->pid << endl;
 }
 
 /**---------------------------ChangeDirCommand---------------------------------*/
@@ -571,20 +590,20 @@ void ChangeDirCommand::execute(){
   }
   // max args allowed is 1:
   else if (argCount > 1){
-    std::cerr << "smash error: cd: too many arguments" << std::endl;
+    cerr << "smash error: cd: too many arguments" << endl;
     return;
   }
   // go back to previous dir
   else if (strcmp(args[0] ,"-") == 0){
     // if dir wasn't changed before
     if (strcmp(smash.lastPwd.c_str() ,"-1") == 0){
-      std::cerr << "smash error: cd: OLDPWD not set" << std::endl;
+      cerr << "smash error: cd: OLDPWD not set" << endl;
       return;
     }
     // change to prev dir
     else{
       if(chdir(smash.lastPwd.c_str()) != 0){
-        std::perror("smash error: chdir failed");
+        perror("smash error: chdir failed");
         return;
       }
       else{
@@ -596,7 +615,7 @@ void ChangeDirCommand::execute(){
   // change to new dir and update prev dir to current
   else{
       if(chdir(args[0]) != 0){
-        std::perror("smash error: chdir failed");
+        perror("smash error: chdir failed");
       }
       else{
         smash.lastPwd = cwd;
@@ -608,9 +627,9 @@ void ChangeDirCommand::execute(){
 }
 
 /**---------------------------aliasCommand---------------------------------*/
-// C'tor:    aliasCommand(const char *cmd_line, std::map<std::string, std::string>& alias_map, std::set<std::string>& built_in_commands, std::list<std::pair<std::string, std::string>>& alias_list);
+// C'tor:    aliasCommand(const char *cmd_line, map<string, string>& alias_map, set<string>& built_in_commands, list<pair<string, string>>& alias_list);
 
-aliasCommand::aliasCommand(const char *cmd_line, std::map<std::string, std::string>& alias_map,  std::set<std::string>& built_in_commands, std::list<std::pair<std::string, std::string>>& alias_list): BuiltInCommand(cmd_line),
+aliasCommand::aliasCommand(const char *cmd_line, map<string, string>& alias_map,  set<string>& built_in_commands, list<pair<string, string>>& alias_list): BuiltInCommand(cmd_line),
                                                                                                                                         cmd_line(cmd_line),
                                                                                                                                         alias_map(alias_map),
                                                                                                                                         built_in_commands(built_in_commands),
@@ -628,19 +647,19 @@ void aliasCommand::execute(){
   if (argCount == 1){
     // show content:
     for (const auto& cur : alias_list){
-      std::cout << cur.first << "='" << cur.second << "'" << std::endl;
+      cout << cur.first << "='" << cur.second << "'" << endl;
     }
     temp = false;
   }
 
   string clean_command = _trim(this->cmd_line);
   // in substr: first argument is where to start and 2nd argument how many chars to read
-  std::string name = clean_command.substr(clean_command.find_first_of(" ") + 1, clean_command.find_first_of("=") - clean_command.find_first_of(" ") -1);
-  std::string command = clean_command.substr(clean_command.find_first_of("=") + 1 );
+  string name = clean_command.substr(clean_command.find_first_of(" ") + 1, clean_command.find_first_of("=") - clean_command.find_first_of(" ") -1);
+  string command = clean_command.substr(clean_command.find_first_of("=") + 1 );
   while(temp == true) {
 
     if(clean_command.find_first_of("=") == string::npos){
-      std::cerr << "smash error: alias: invalid syntax =" << std::endl;
+      cerr << "smash error: alias: invalid syntax =" << endl;
       temp = false;
       continue;
     }
@@ -650,7 +669,7 @@ void aliasCommand::execute(){
         command.erase(command.begin());
     }
     else {
-      std::cerr << "smash error: alias: invalid syntax" << clean_command << std::endl;
+      cerr << "smash error: alias: invalid syntax" << clean_command << endl;
       temp = false;
       continue;
     }
@@ -658,7 +677,7 @@ void aliasCommand::execute(){
         command.pop_back();
     }
     else{
-      std::cerr << "smash error: alias: invalid syntax" << clean_command << std::endl;
+      cerr << "smash error: alias: invalid syntax" << clean_command << endl;
       temp = false;
       continue;
     }
@@ -668,16 +687,16 @@ void aliasCommand::execute(){
 
     // command already exists -> error
     if (aliasCommand != this->alias_map.end() || builtInCommand != this->built_in_commands.end()){
-        std::cerr << "smash error: alias: "<< name <<" already exists or is a reserved command" << std::endl;
+        cerr << "smash error: alias: "<< name <<" already exists or is a reserved command" << endl;
     }
     // try to add to map
     // validate the format and syntax
-    else if (std::regex_match(name, std::regex("^[a-zA-Z0-9_]+$"))){
+    else if (regex_match(name, regex("^[a-zA-Z0-9_]+$"))){
       this->alias_list.push_back({name, command});
       this->alias_map[name] = command;
     }
     else{
-      std::cerr << "smash error: alias: invalid syntax" <<std::endl;
+      cerr << "smash error: alias: invalid syntax" <<endl;
     }
     temp = false;
     continue;
@@ -687,7 +706,7 @@ void aliasCommand::execute(){
 
 /**---------------------------unaliasCommand---------------------------------*/
 // C'tor:
-unaliasCommand::unaliasCommand(const char *cmd_line, std::map<std::string, std::string>& alias_map, std::list<std::pair<std::string, std::string>>& alias_list): BuiltInCommand(cmd_line),alias_map(alias_map), alias_list(alias_list){
+unaliasCommand::unaliasCommand(const char *cmd_line, map<string, string>& alias_map, list<pair<string, string>>& alias_list): BuiltInCommand(cmd_line),alias_map(alias_map), alias_list(alias_list){
   this->cmd_line = _trim(string(cmd_line));
 }
 
@@ -697,12 +716,12 @@ void unaliasCommand::execute(){
   int argCount = _parseCommandLine(this->cmd_line.c_str(), args);
 
   if (argCount == 1){
-    std::cerr << "smash error: unalias: not enough arguments" << std::endl;
+    cerr << "smash error: unalias: not enough arguments" << endl;
   }
   for( int i = 1; i<argCount; i++){
     // the name found
     if(this->alias_map.find(args[i]) != this->alias_map.end()){
-      std::string name = args[i];
+      string name = args[i];
       // Remove the alias from the list
       for (auto it = this->alias_list.begin(); it != this->alias_list.end(); ++it) {
         if (it->first == name) {
@@ -713,7 +732,7 @@ void unaliasCommand::execute(){
       this->alias_map.erase(name);
     }
     else{
-      std::cerr << "smash error: unalias: "<< args[i] <<" alias does not exist" << std::endl;
+      cerr << "smash error: unalias: "<< args[i] <<" alias does not exist" << endl;
       break;
     }
   }
@@ -722,7 +741,7 @@ void unaliasCommand::execute(){
 
 /**---------------------------aliasConverterFunction---------------------------------*/
 // returns converted cmd in case of aliased command. if not aliased - does nothing.
-string replaceAliased(const char *cmd_line, const map<std::string, std::string> map ){
+string replaceAliased(const char *cmd_line, const map<string, string> map ){
     // format the cmd-line
   char* args[COMMAND_MAX_ARGS + 1];
   int argCount = _parseCommandLine(cmd_line, args);
@@ -731,7 +750,7 @@ string replaceAliased(const char *cmd_line, const map<std::string, std::string> 
     auto aliasCommand = map.find(args[0]);
     // it is an alias command
     if (aliasCommand != map.end()){
-      std::string replacedCommand = aliasCommand->second;
+      string replacedCommand = aliasCommand->second;
       // append remaining arguments from cmd_line 
       for (int i = 1; i < argCount; ++i) {
           replacedCommand += " ";           
@@ -754,10 +773,10 @@ NetInfo::NetInfo(const char *cmd_line) : Command(cmd_line), cmd_line(cmd_line){
 void NetInfo::execute() {
   char *args[COMMAND_MAX_ARGS];
   int numOfArgs = _parseCommandLine(cmd_line.c_str(), args);
-  std::string interface;
+  string interface;
 
   if (numOfArgs < 2){
-    std::cerr << "smash error: netinfo: interface not specified" << std::endl;
+    cerr << "smash error: netinfo: interface not specified" << endl;
     _argsFree(numOfArgs, args);
     return;
   // TODO: what to do if more then one interface?
@@ -778,7 +797,7 @@ void NetInfo::execute() {
   return;
 }
 
-void NetInfo::printDeafultGateway(const std::string &interface){
+void NetInfo::printDeafultGateway(const string &interface){
   char buffer[BUF];
 
   int fd = open("/proc/net/route", O_RDONLY);
@@ -796,13 +815,13 @@ void NetInfo::printDeafultGateway(const std::string &interface){
 
   buffer[b_read] = '\0';
 
-  std::istringstream stream(buffer);
-  std::string line;
+  istringstream stream(buffer);
+  string line;
 
   // reads each line from the string stream (stream) into the line string, looking for the deafult gateway.
-  while (std::getline(stream, line)) {
-    std::istringstream line_steam(line);
-    std::string interface_name, destination, gateway;
+  while (getline(stream, line)) {
+    istringstream line_steam(line);
+    string interface_name, destination, gateway;
 
     // pharse each line interface_name, dest, gateway 
     if (!(line_steam >> interface_name >> destination >> gateway)){
@@ -811,12 +830,12 @@ void NetInfo::printDeafultGateway(const std::string &interface){
 
     if (interface_name == interface && destination == DEFAULT_GATEWAY_DEST) {
       // convert to hexa from binary
-      unsigned int address = std::stoul(gateway, nullptr, 16);
+      unsigned int address = stoul(gateway, nullptr, 16);
 
       struct in_addr gateway_addr;
       gateway_addr.s_addr = address;
 
-      std::cout << "Default Gateway: " << inet_ntoa(gateway_addr) << std::endl;
+      cout << "Default Gateway: " << inet_ntoa(gateway_addr) << endl;
       break;
     }
   }
@@ -840,35 +859,35 @@ void NetInfo::printDNSServers(){
 
   buffer[b_read] = '\0';
 
-  std::istringstream stream(buffer);
-  std::string line;
+  istringstream stream(buffer);
+  string line;
 
   bool first = true;
   // reads each line from the string stream (stream) into the line string, looking for the deafult gateway.
-  while (std::getline(stream, line)) {
+  while (getline(stream, line)) {
     if (line.find("nameserver") == 0) {
-      std::istringstream line_steam(line);
-      std::string token, dns;
+      istringstream line_steam(line);
+      string token, dns;
 
       if (line_steam >> token >> dns) {
         if (first) {
-          std::cout << "DNS Servers: ";
+          cout << "DNS Servers: ";
         }
         if (!first) {
-          std::cout << ", ";
+          cout << ", ";
         }
-        std::cout << dns;
+        cout << dns;
         first = false;
       }
     }
   }
-  std::cout << "\n";
+  cout << "\n";
 
   close(fd);
 }
 
 
-void NetInfo::printIPSubnet(const std::string &interface){
+void NetInfo::printIPSubnet(const string &interface){
   int sock = socket(AF_INET, SOCK_DGRAM, 0);
   if (sock < 0) {
   perror("smash error: socket failed");
@@ -882,7 +901,7 @@ void NetInfo::printIPSubnet(const std::string &interface){
   if (ioctl(sock, SIOCGIFADDR, &inf) == 0) {
     struct sockaddr_in *ip = (struct sockaddr_in *)&inf.ifr_addr;
     // convert the IP address from binary to a string.
-    std::cout << "IP Address: " << inet_ntoa(ip->sin_addr) << std::endl;
+    cout << "IP Address: " << inet_ntoa(ip->sin_addr) << endl;
   }
   else{
     perror("smash error: ioctl failed");
@@ -891,7 +910,7 @@ void NetInfo::printIPSubnet(const std::string &interface){
   // queries the subnet mask address of the specified interface
   if (ioctl(sock, SIOCGIFNETMASK, &inf) == 0) {
     struct sockaddr_in *mask = (struct sockaddr_in *)&inf.ifr_netmask;
-    std::cout << "Subnet Mask: " << inet_ntoa(mask->sin_addr) << std::endl;
+    cout << "Subnet Mask: " << inet_ntoa(mask->sin_addr) << endl;
   }
   else{
     perror("smash error: ioctl failed");
@@ -900,7 +919,7 @@ void NetInfo::printIPSubnet(const std::string &interface){
 }
 
 // return true if the provided interfacde name is valid.
-bool NetInfo::isInterfaceValid(const std::string &interface) {
+bool NetInfo::isInterfaceValid(const string &interface) {
   // create new socket, used for communication with the network stack to retrieve interface_namermation about network interfaces.
   int sock = socket(AF_INET, SOCK_DGRAM, 0);    // AF_INET is the address family for IPv4, SOCK_DGRAM is the socket type as datagram-based
   if (sock < 0) {
@@ -916,7 +935,7 @@ bool NetInfo::isInterfaceValid(const std::string &interface) {
   if (ioctl(sock, SIOCGIFADDR, &inf) < 0){
     // ENODEV is an error code indicating "No such device," meaning the specified network interface does not exist.
     if (errno == ENODEV){ 
-      std::cerr << "smash error: netinfo: interface " << interface << " does not exist" << std::endl;
+      cerr << "smash error: netinfo: interface " << interface << " does not exist" << endl;
     } 
     else{
       perror("smash error: ioctl failed");
@@ -980,7 +999,7 @@ void ExternalCommand::execute() {
       }
     }
     //none of the above
-    std::cerr << "smash error: command not found: " << args[0] << std::endl;
+    cerr << "smash error: command not found: " << args[0] << endl;
     exit(EXIT_FAILURE);
   }
   else if (!backgroundFlag){  // Parent process
@@ -1009,7 +1028,7 @@ ListDirCommand::ListDirCommand(const char *cmd_line) : Command(cmd_line) {
 
     // too many arguments
     if (numOfArgs > 2) { 
-        std::cerr << "smash error: listdir: too many arguments" << std::endl;
+        cerr << "smash error: listdir: too many arguments" << endl;
         this->target_dir = INVALID_DIR;
     } else if (numOfArgs == 2) {
         this->target_dir = args[1];
@@ -1051,18 +1070,18 @@ void ListDirCommand::execute() {
 * `smash error` if:
 *  - If more than one argument is provided "smash error: listdir: too many arguments"
 */
-void ListDirCommand::listDirectory(int dir_fd, const std::string& path, int indent_level) {
+void ListDirCommand::listDirectory(int dir_fd, const string& path, int indent_level) {
     char buffer[BUF];
     struct stat entry_stat;     // metadata about a file or directory.
-    std::vector<std::string> dirs;
-    std::vector<std::string> files;
+    vector<string> dirs;
+    vector<string> files;
 
     int num_read = 0; 
     while ((num_read = syscall(SYS_getdents, dir_fd, buffer, BUF)) > 0) {
         for (int current = 0; current < num_read;) {
             // buffer + current points to the start of the current directory entry
             struct linux_dirent *dirent = (struct linux_dirent *)(buffer + current); 
-            std::string name = dirent->d_name;     // d_name: name of the file/dir.
+            string name = dirent->d_name;     // d_name: name of the file/dir.
 
             // skip special entries
             if (name == "." || name == "..") {
@@ -1070,7 +1089,7 @@ void ListDirCommand::listDirectory(int dir_fd, const std::string& path, int inde
                 continue;
             }
 
-            std::string full_path = path + "/" + name;
+            string full_path = path + "/" + name;
 
             // use stat to check if the entry is a file or directory
             if (stat(full_path.c_str(), &entry_stat) == -1) {
@@ -1097,17 +1116,17 @@ void ListDirCommand::listDirectory(int dir_fd, const std::string& path, int inde
     }
 
     // sort alphabetically
-    std::sort(dirs.begin(), dirs.end());
-    std::sort(files.begin(), files.end());
+    sort(dirs.begin(), dirs.end());
+    sort(files.begin(), files.end());
 
     // print dirs first
     for (const auto& dir : dirs) {
         for (int i = 0; i < indent_level; ++i){
-          std::cout << "\t";
+          cout << "\t";
         } 
-        std::cout << dir << std::endl;
+        cout << dir << endl;
 
-        std::string full_path_dir = path + "/" + dir;
+        string full_path_dir = path + "/" + dir;
         int sub_dir_fd = open(full_path_dir.c_str(), O_RDONLY | O_DIRECTORY);
         if (sub_dir_fd == -1) {
             perror("smash error: open failed");
@@ -1120,8 +1139,8 @@ void ListDirCommand::listDirectory(int dir_fd, const std::string& path, int inde
 
     // print files
     for (const auto& file : files) {
-        for (int i = 0; i < indent_level; ++i) std::cout << "\t";
-        std::cout << file << std::endl;
+        for (int i = 0; i < indent_level; ++i) cout << "\t";
+        cout << file << endl;
     }
     return;
 }
@@ -1142,39 +1161,31 @@ void WhoAmICommand::execute() {
     perror("smash error: getenv failed");
     return;
   }
-  std::cout << userEnv << " " << homeEnv << std::endl;
+  cout << userEnv << " " << homeEnv << endl;
 }
 
 /**---------------------------RedirectIOCommand---------------------------------*/
 // C'tor:
-RedirectIOCommand::RedirectIOCommand(const char *cmd_line) : Command(cmd_line){
+RedirectIOCommand::RedirectIOCommand(const char *cmd_line, tuple<string, size_t> pos) : Command(cmd_line){
   this->cmd_line = cmd_line;
+  this->position = pos;
 }
 
 void RedirectIOCommand::execute() {
-  int i, fileFD;
-  char* args[COMMAND_MAX_ARGS + 1];
-  int numOfArgs = _parseCommandLine(this->cmd_line.c_str(), args);    // parse the command line
-  if (!numOfArgs) return;
+  int fileFD;
 
-  for (i = 0; i < numOfArgs; i++) {                                   // find the index that contains the redirection symbol
-    if (!strcmp(args[i], ">") || !strcmp(args[i], ">>")) {
-      break;
-    }
-  }
+  string arrow = get<0>(this->position);
+  size_t redirectionPos = get<1>(this->position);
 
-  string arrow = args[i], firstArg, thirdArg;
-  firstArg = _trim(this->cmd_line.substr(0, this->cmd_line.find_first_of(arrow)));
-  thirdArg = _trim(this->cmd_line.substr(this->cmd_line.find_first_of(arrow) + arrow.length()));
+  string firstArg = _trim(this->cmd_line.substr(0, redirectionPos));
+  string thirdArg = _trim(this->cmd_line.substr(redirectionPos + arrow.length()));
 
   if (!arrow.compare(">>")) {                                         // open with seek pointer in the end  
-    fileFD = open(thirdArg.c_str(), O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
+    fileFD = open(thirdArg.c_str(), O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
   }
   else {                                                              // open with seek pointer at the start 
-    fileFD = open(thirdArg.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
+    fileFD = open(thirdArg.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
   }
-
-  _argsFree(numOfArgs, args);                                   // release that bitch
 
   if (fileFD == -1) { // if no file me sad
     perror("smash error: open failed");
@@ -1213,27 +1224,18 @@ void RedirectIOCommand::execute() {
 
 /**---------------------------PipeCommand---------------------------------*/
 // C'tor:
-PipeCommand::PipeCommand(const char *cmd_line) : Command(cmd_line){
+PipeCommand::PipeCommand(const char *cmd_line, tuple<string, size_t> pos) : Command(cmd_line){
   this->cmd_line = cmd_line;
+  this->position = pos;
 }
 
 void PipeCommand::execute() {
-  int i;
-  char* args[COMMAND_MAX_ARGS + 1];
-  int numOfArgs = _parseCommandLine(this->cmd_line.c_str(), args);    // parse the command line
-  if (!numOfArgs) return;
 
-  for (i = 0; i < numOfArgs; i++) {                                   // find the index that contains the redirection symbol
-    if (!strcmp(args[i], "|") || !strcmp(args[i], "|&")) {
-      break;
-    }
-  }
+  string pipeType = get<0>(this->position);
+  size_t redirectionPos = get<1>(this->position);
 
-  string pipeType = args[i], firstCommand, secondCommand;
-  firstCommand = _trim(this->cmd_line.substr(0, this->cmd_line.find_first_of(pipeType)));
-  secondCommand = _trim(this->cmd_line.substr(this->cmd_line.find_first_of(pipeType) + pipeType.length()));
-
-  _argsFree(numOfArgs, args);                                   // release that bitch
+  string firstCommand = _trim(this->cmd_line.substr(0, redirectionPos));
+  string secondCommand = _trim(this->cmd_line.substr(redirectionPos + pipeType.length()));
 
   int pipeFd[2];
   if (pipe(pipeFd) == -1) {
@@ -1343,19 +1345,19 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
   int numOfArgs = _parseCommandLine(line.c_str(), args);
   if (!numOfArgs) return nullptr;
   
-  bool redirectionCommand = isRedirection(numOfArgs, args);
-  bool pipeCommand = isPipe(numOfArgs, args);
+  pair<bool, tuple<string, size_t>> redirectionCommand = isRedirection(cmd_line);      //first contains if found, second contains the symbol and position
+  pair<bool, tuple<string, size_t>> pipeCommand = isPipe(cmd_line);
 
   const char* cmd_s = line.c_str();
 
   string firstWord = args[0];                                           //it was already a string and its easy to use
   _argsFree(numOfArgs, args);                                           //free the memory of its sins
 
-  if (pipeCommand) {
-    return new PipeCommand(cmd_s);
+  if (pipeCommand.first) {
+    return new PipeCommand(cmd_s,pipeCommand.second);
   }
-  else if (redirectionCommand) {                                       
-    return new RedirectIOCommand(cmd_s);
+  else if (redirectionCommand.first) {                                   
+    return new RedirectIOCommand(cmd_s,redirectionCommand.second);
   }
   else if (firstWord.compare("alias") == 0) {
     return new aliasCommand(cmd_s, smash.alias_map, smash.built_in_commands, smash.alias_list);
@@ -1417,7 +1419,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
   try {
     cmd = CreateCommand(cmd_line);
   } 
-  catch (const std::exception &e) {
+  catch (const exception &e) {
         perror("smash error: memory allocation failed");
         return;
   }
@@ -1426,7 +1428,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
 }
 
 
-void SmallShell::setCurrentDirectory(const std::string newDir){
+void SmallShell::setCurrentDirectory(const string newDir){
   this->currPwd = newDir;
 }
 
@@ -1473,7 +1475,7 @@ void JobsList::printJobsList() {
 }
 
 void JobsList::JobEntry::printEntry() const {
-  std::cout << "[" << this->ID << "] " << this->command->getLine() << std::endl;
+  cout << "[" << this->ID << "] " << this->command->getLine() << endl;
 }
 
 void JobsList::killAllJobs() {
@@ -1483,7 +1485,7 @@ void JobsList::killAllJobs() {
       perror("smash error: kill failed");
     }
     else{
-      std::cout << "smash: process " << job.getPID() <<" was killed" << std::endl;
+      cout << "smash: process " << job.getPID() <<" was killed" << endl;
     }
   }
   removeFinishedJobs();
