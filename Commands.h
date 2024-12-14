@@ -13,6 +13,7 @@
 #define BUF (4096)
 #define DEFAULT_GATEWAY_DEST "00000000"
 #define INITIAL_FG (-1)
+#define BUF_SIZE (1024)
 /**--------------------------------------------------------------------*/
 
 struct linux_dirent {
@@ -78,8 +79,9 @@ public:
 class PipeCommand : public Command {
 private:
     std::string cmd_line;
+    std::tuple<std::string, size_t> position;
 public:
-    PipeCommand(const char *cmd_line);
+    PipeCommand(const char *cmd_line, std::tuple<std::string, size_t> pos);
 
     virtual ~PipeCommand() {
     }
@@ -93,8 +95,9 @@ class RedirectIOCommand : public Command {
 private:
     // TODO: Add your data members
     std::string cmd_line;
+    std::tuple<std::string, size_t> position;
 public:
-    explicit RedirectIOCommand(const char *cmd_line);
+    explicit RedirectIOCommand(const char *cmd_line, std::tuple<std::string, size_t> pos);
 
     virtual ~RedirectIOCommand() {
     }
