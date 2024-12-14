@@ -277,7 +277,7 @@ CHPromptCommand::CHPromptCommand(const char *cmd_line) : BuiltInCommand(cmd_line
   int numOfArgs = _parseCommandLine(line.c_str(), args);    // parse the command line
   if (!numOfArgs) return;
 
-  this->newPromptName =  args[1] ? args[1]: "";
+  this->newPromptName =  numOfArgs >= 2 ? args[1]: "";
   _argsFree(numOfArgs, args);
 }
 
@@ -381,7 +381,7 @@ void QuitCommand::execute() {
   int numOfArgs = _parseCommandLine(line.c_str(), args);    // parse the command line
   if (!numOfArgs) return;
 
-  string secondArg = args[1] ? args[1] : "";
+  string secondArg = numOfArgs >= 2 ? args[1] : "";
   _argsFree(numOfArgs, args);
   
   if (!secondArg.compare("kill")) {
@@ -406,44 +406,6 @@ KillCommand::KillCommand(const char *cmd_line, JobsList *jobs) : BuiltInCommand(
   this->cmd_line = cmd_line;
   this->jobs = jobs;
 }
-
-// void KillCommand::execute() {
-
-//   char* args[COMMAND_MAX_ARGS];
-//   string line = cmd_line;
-//   int numOfArgs = _parseCommandLine(line.c_str(), args);    // parse the command line
-//   if (!numOfArgs) return;
-
-//   string secondArg = args[1] ? args[1] : "";
-//   string thirdArg = args[2] ? args[2] : "";
-//   _argsFree(numOfArgs, args);
-  
-//   //only 1-2 args or not valid numbers or not a valid signal
-//   if ((!secondArg.compare("") || !thirdArg.compare("")) &&
-//       ( _isValidSignal(secondArg) || !_isPositiveInteger(thirdArg))) {
-//         cerr << "smash error: kill: invalid arguments" << endl;
-//     return;
-//   }
-//   int ID = stoi(thirdArg);
-//   JobsList::JobEntry* job = jobs->getJobById(ID);
-
-//   if (!job) {
-//     cerr << "smash error: kill: job-id " << ID << " does not exist" << endl;
-//     return;
-//   }
-//   //need to kill job when adding the function
-//   int signal = abs(stoi(secondArg));
-//   cout << "signal number " << signal <<" was sent to pid " << job->getPID() << endl;
-//   kill(job->getPID(), signal);
-
-//   if (signal == SIGKILL) {
-//     job->isActive = false;
-//   }
-
-//   jobs->removeFinishedJobs();
-// }
-
-
 
 void KillCommand::execute() {
   
@@ -501,14 +463,12 @@ void ShowPidCommand::execute() {
 /**---------------------------ChangeDirCommand---------------------------------*/
 // C'tor:
 ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd) : BuiltInCommand(cmd_line){
-  //this->last_pwd = plastPwd;
-  
   char* args[COMMAND_MAX_ARGS];
   string line = cmd_line;
   int numOfArgs = _parseCommandLine(line.c_str(), args);    // parse the command line
   if (!numOfArgs) return;
 
-  this->dir_to_repl =  args[1] ? args[1] : "";
+  this->dir_to_repl =  numOfArgs >= 2 ? args[1] : "";
   _argsFree(numOfArgs, args);
 
 }
