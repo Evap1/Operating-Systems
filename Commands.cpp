@@ -204,17 +204,80 @@ bool isInPATHEnvVar(const char* arg) {
   while (std::getline(pathStream, pathDir, ':')) {
     
     std::string full_path = pathDir + "/" + arg;    // construct the full path to the command
-    std::cerr << full_path << std::endl;
     if (access(full_path.c_str(), X_OK) == 0) {     // check if the file exists and is executable
-      std::cerr << "entered if" << std::endl;
       return true;
     }
   }
   return false;
 }
 
-bool isInOurPaths(const char* arg) {
-  
+/**
+* check if the argument starts with "./" (simple exe)
+*/
+string isSimpleInDirectoryExe(const char* arg) {
+  string ptr = arg;
+  ptr = _trim(ptr);
+  if (ptr.rfind("./", 0) == 0) {
+    return ptr.substr(2);
+  }
+  return "";
+}
+
+/**
+* searches for the given command (arg) in all the current directory and its sub directories recurssivly
+*/
+std::string findExecutableInCurrentDir(const std::string& dirPath, const std::string& target) {
+    int fd = open(dirPath.c_str(), O_RDONLY | O_DIRECTORY);
+    if (fd == -1) {
+        perror(("Failed to open directory: " + dirPath).c_str());
+        return "";
+    }
+
+    char buffer[BUF_SIZE];
+    struct linux_dirent* d;
+    int nread;
+
+    while ((nread = syscall(SYS_getdents, fd, buffer, BUF_SIZE)) > 0) {
+        for (int bpos = 0; bpos < nread;) {
+            d = (struct linux_dirent*) (buffer + bpos);
+            std::string entryName = d->d_name;
+
+            // Skip "." and ".."
+            if (entryName == "." || entryName == "..") {
+                bpos += d->d_reclen;
+                continue;
+            }
+
+            // Construct the full path of the entry
+            std::string fullPath = dirPath + "/" + entryName;
+
+            // Check if the entry matches the target
+            if (entryName == target) {
+                close(fd);
+                return fullPath;  // Found the executable file
+            }
+
+            // Check if the entry is a directory
+            struct stat st;
+            if (fstatat(fd, entryName.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISDIR(st.st_mode)) {
+                // Recursively search in subdirectories
+                std::string result = findExecutableInCurrentDir(fullPath, target);
+                if (!result.empty()) {
+                    close(fd);  // Close the current directory before returning
+                    return result;  // Return the found path
+                }
+            }
+
+            bpos += d->d_reclen;
+        }
+    }
+
+    if (nread == -1) {
+        perror(("Failed to read directory entries in: " + dirPath).c_str());
+    }
+
+    close(fd);
+    return "";  // Return an empty string if not found
 }
 
 /**
@@ -894,6 +957,7 @@ void ExternalCommand::execute() {
   if (pid == 0) {  // Child process
     setpgrp();
 
+      string target = isSimpleInDirectoryExe(args[0]);
       if (containsWildcards(args)) {  // Handle wildcards with bash
       const char* bashPath = "/bin/bash";
       const char* const bashArgs[] = {bashPath, "-c", this->cmd_line.c_str(), nullptr};
@@ -907,13 +971,17 @@ void ExternalCommand::execute() {
       perror("smash error: execvp failed");
       exit(EXIT_FAILURE);
     }
-    else if(isInOurPaths(args[0])) {
-
+    else if(!target.empty()) {           //found a command that looks like an executable - check in directory or sub directories 
+      string path = findExecutableInCurrentDir(".", target);
+      if (!path.empty()) {
+        execv(path.c_str(), args);
+        perror("smash error: execv failed");
+        exit(EXIT_FAILURE);
+      }
     }
-    else {
-      std::cerr << "smash error: command not found: " << args[0] << std::endl;
-      exit(EXIT_FAILURE);
-    }
+    //none of the above
+    std::cerr << "smash error: command not found: " << args[0] << std::endl;
+    exit(EXIT_FAILURE);
   }
   else if (!backgroundFlag){  // Parent process
     int status;
@@ -1283,11 +1351,11 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
   string firstWord = args[0];                                           //it was already a string and its easy to use
   _argsFree(numOfArgs, args);                                           //free the memory of its sins
 
-  if (redirectionCommand) {                                             // check to see if IO command first
-    return new RedirectIOCommand(cmd_s);
-  }
-  else if (pipeCommand) {
+  if (pipeCommand) {
     return new PipeCommand(cmd_s);
+  }
+  else if (redirectionCommand) {                                       
+    return new RedirectIOCommand(cmd_s);
   }
   else if (firstWord.compare("alias") == 0) {
     return new aliasCommand(cmd_s, smash.alias_map, smash.built_in_commands, smash.alias_list);
