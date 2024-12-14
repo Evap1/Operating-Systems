@@ -867,6 +867,7 @@ void ExternalCommand::execute() {
   pid_t pid = fork();
   if (pid == -1) {
     perror("smash error: fork failed");
+    _argsFree(numOfArgs, args);
     return;
   }
 
@@ -878,26 +879,31 @@ void ExternalCommand::execute() {
 
       execv(bashPath, const_cast<char**>(bashArgs));
       perror("smash error: execv failed");
+      _argsFree(numOfArgs, args);
       exit(EXIT_FAILURE);
     }
     else if (isInPATHEnvVar(args[0])) {  // Handle commands in PATH
       execvp(args[0], args);
       perror("smash error: execvp failed");
+      _argsFree(numOfArgs, args);
       exit(EXIT_FAILURE);
     }
     else if(isSimpleInDirectoryExe(args[0])) {           //found a command that looks like an executable
       execv(args[0], args);
       perror("smash error: execv failed");
+      _argsFree(numOfArgs, args);
       exit(EXIT_FAILURE);
     }
     //none of the above
     cerr << "smash error: command not found: " << args[0] << endl;
+    _argsFree(numOfArgs, args);
     exit(EXIT_FAILURE);
   }
   else if (!backgroundFlag){  // Parent process
     int status;
     SmallShell::getInstance().setFGPID(pid);
     if (waitpid(pid, &status, 0) == -1) {
+      _argsFree(numOfArgs, args);
       perror("smash error: waitpid failed");
     }
     SmallShell::getInstance().setFGPID(INITIAL_FG);
@@ -907,9 +913,7 @@ void ExternalCommand::execute() {
     SmallShell::getInstance().getJobs()->addJob(this, pid);           // sends the original command so itll print aliased version
   }
 
-  for (int i = 0; i < numOfArgs; ++i) {
-    free(args[i]);
-  }
+  _argsFree(numOfArgs, args);
 }
 
 /**---------------------------ListDirCommand---------------------------------*/
