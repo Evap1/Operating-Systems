@@ -165,7 +165,7 @@ public:
 
 class ChangeDirCommand : public BuiltInCommand {
 private:
-    std::string dir_to_repl;
+    std::string cmd_line;
     std::string last_pwd;
     
 public:
@@ -391,6 +391,7 @@ private:
 
 public:
     std::set<std::string> built_in_commands;
+    std::set<std::string> built_in_commands_bg;
     std::map<std::string, std::string> alias_map;
     std::list<std::pair<std::string, std::string>> alias_list;
     std::string lastPwd;

@@ -462,45 +462,36 @@ void ShowPidCommand::execute() {
 
 /**---------------------------ChangeDirCommand---------------------------------*/
 // C'tor:
-ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd) : BuiltInCommand(cmd_line){
-  char* args[COMMAND_MAX_ARGS];
-  string line = cmd_line;
-  int numOfArgs = _parseCommandLine(line.c_str(), args);    // parse the command line
-  if (!numOfArgs) return;
-
-  this->dir_to_repl =  numOfArgs >= 2 ? args[1] : "";
-  _argsFree(numOfArgs, args);
+ChangeDirCommand::ChangeDirCommand(const char *cmd_line, char **plastPwd) : BuiltInCommand(cmd_line), cmd_line(cmd_line), last_pwd(INVALID_DIR){
 
 }
 
 void ChangeDirCommand::execute(){
   char* args[COMMAND_MAX_ARGS];
-  int argCount = _parseCommandLine(this->dir_to_repl.c_str(), args);
+  int argCount = _parseCommandLine(this->cmd_line.c_str(), args);
   SmallShell &smash = SmallShell::getInstance();
   string cwd = smash.getCurrentDirectory();
 
   // no dir, do nothing
-  if (argCount == 0){
+  if (argCount == 0 || argCount == 1){
     _argsFree(argCount, args);
     return;
   }
-  // max args allowed is 1:
-  else if (argCount > 1){
+  string dir_name = args[1];
+  // 1- cd 2- dir_name
+  if (argCount > 2){
     cerr << "smash error: cd: too many arguments" << endl;
-    return;
   }
   // go back to previous dir
-  else if (strcmp(args[0] ,"-") == 0){
+  else if (strcmp(dir_name.c_str() ,"-") == 0){
     // if dir wasn't changed before
-    if (strcmp(smash.lastPwd.c_str() ,"-1") == 0){
+    if (strcmp(smash.lastPwd.c_str() , INVALID_DIR) == 0){
       cerr << "smash error: cd: OLDPWD not set" << endl;
-      return;
     }
     // change to prev dir
     else{
       if(chdir(smash.lastPwd.c_str()) != 0){
         perror("smash error: chdir failed");
-        return;
       }
       else{
         smash.lastPwd = cwd;
@@ -510,7 +501,7 @@ void ChangeDirCommand::execute(){
   }
   // change to new dir and update prev dir to current
   else{
-      if(chdir(args[0]) != 0){
+      if(chdir(dir_name.c_str()) != 0){
         perror("smash error: chdir failed");
       }
       else{
@@ -549,13 +540,13 @@ void aliasCommand::execute(){
   }
 
   string clean_command = _trim(this->cmd_line);
+
   // in substr: first argument is where to start and 2nd argument how many chars to read
   string name = clean_command.substr(clean_command.find_first_of(" ") + 1, clean_command.find_first_of("=") - clean_command.find_first_of(" ") -1);
   string command = clean_command.substr(clean_command.find_first_of("=") + 1 );
   while(temp == true) {
-
     if(clean_command.find_first_of("=") == string::npos){
-      cerr << "smash error: alias: invalid syntax =" << endl;
+      cerr << "smash error: alias: invalid alias format" << endl;
       temp = false;
       continue;
     }
@@ -565,7 +556,7 @@ void aliasCommand::execute(){
         command.erase(command.begin());
     }
     else {
-      cerr << "smash error: alias: invalid syntax" << clean_command << endl;
+      cerr << "smash error: alias: invalid alias format" << endl;
       temp = false;
       continue;
     }
@@ -573,13 +564,13 @@ void aliasCommand::execute(){
         command.pop_back();
     }
     else{
-      cerr << "smash error: alias: invalid syntax" << clean_command << endl;
+      cerr << "smash error: alias: invalid alias format" << endl;
       temp = false;
       continue;
     }
 
     auto aliasCommand = this->alias_map.find(name);
-    auto builtInCommand = this->built_in_commands.find(command);
+    auto builtInCommand = this->built_in_commands.find(name);
 
     // command already exists -> error
     if (aliasCommand != this->alias_map.end() || builtInCommand != this->built_in_commands.end()){
@@ -592,7 +583,7 @@ void aliasCommand::execute(){
       this->alias_map[name] = command;
     }
     else{
-      cerr << "smash error: alias: invalid syntax" <<endl;
+      cerr << "smash error: alias: invalid alias format" <<endl;
     }
     temp = false;
     continue;
@@ -641,21 +632,34 @@ string replaceAliased(const char *cmd_line, const map<string, string> map ){
     // format the cmd-line
   char* args[COMMAND_MAX_ARGS + 1];
   int argCount = _parseCommandLine(cmd_line, args);
+  SmallShell &smash = SmallShell::getInstance();
 
   if (argCount > 0) {
+    
+    // remove & from build in commands if exists 
+    if (smash.built_in_commands_bg.find(args[0]) != smash.built_in_commands_bg.end() ){
+    _removeBackgroundSign(args[0]);
+    }
+
     auto aliasCommand = map.find(args[0]);
+    string replacedCommand;
     // it is an alias command
     if (aliasCommand != map.end()){
-      string replacedCommand = aliasCommand->second;
-      // append remaining arguments from cmd_line 
-      for (int i = 1; i < argCount; ++i) {
-          replacedCommand += " ";           
-          replacedCommand += args[i];
-      }
-      _argsFree(argCount, args);
-      return replacedCommand;
+      replacedCommand = aliasCommand->second;
     }
+    else {
+      replacedCommand = _trim(args[0]);
+    }
+
+    // append remaining arguments from cmd_line 
+    for (int i = 1; i < argCount; ++i) {
+        replacedCommand += " ";           
+        replacedCommand += args[i];
+    }
+    _argsFree(argCount, args);
+    return replacedCommand;
   }
+
   // clean up and return original cmd_line
   _argsFree(argCount, args);
   return string(cmd_line);
@@ -1190,6 +1194,7 @@ SmallShell::SmallShell() {
   this->promptName = "smash> ";
   this->currPwd = getcwd(nullptr, 0);
   this->lastPwd = "-1";
+  this->built_in_commands_bg = {"alias&", "unalias&", "chprompt&", "showpid&", "pwd&", "cd&", "jobs&", "fg&", "quit&", "kill&", "listdir&", "whoami&", "netinfo&"};
   this->built_in_commands = {"alias", "unalias", "chprompt", "showpid", "pwd", "cd", "jobs", "fg", "quit", "kill", "listdir", "whoami", "netinfo"};
   this->jobs = new JobsList();
   this->fg_pid = INITIAL_FG;
@@ -1241,25 +1246,25 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
   int numOfArgs = _parseCommandLine(line.c_str(), args);
   if (!numOfArgs) return nullptr;
   
-  pair<bool, tuple<string, size_t>> redirectionCommand = isRedirection(cmd_line);      //first contains if found, second contains the symbol and position
-  pair<bool, tuple<string, size_t>> pipeCommand = isPipe(cmd_line);
+  pair<bool, tuple<string, size_t>> redirectionCommand = isRedirection(line.c_str());      //first contains if found, second contains the symbol and position
+  pair<bool, tuple<string, size_t>> pipeCommand = isPipe(line.c_str());
 
   const char* cmd_s = line.c_str();
 
   string firstWord = args[0];                                           //it was already a string and its easy to use
   _argsFree(numOfArgs, args);                                           //free the memory of its sins
 
-  if (pipeCommand.first) {
-    return new PipeCommand(cmd_s,pipeCommand.second);
-  }
-  else if (redirectionCommand.first) {                                   
-    return new RedirectIOCommand(cmd_s,redirectionCommand.second);
-  }
-  else if (firstWord.compare("alias") == 0) {
+  if (firstWord.compare("alias") == 0) {
     return new aliasCommand(cmd_s, smash.alias_map, smash.built_in_commands, smash.alias_list);
   }
   else if (firstWord.compare("unalias") == 0) {
     return new unaliasCommand(cmd_s, smash.alias_map, smash.alias_list);
+  }
+  else if (pipeCommand.first) {
+    return new PipeCommand(cmd_s,pipeCommand.second);
+  }
+  else if (redirectionCommand.first) {                                   
+    return new RedirectIOCommand(cmd_s,redirectionCommand.second);
   }
   else if (firstWord.compare("chprompt") == 0) { 
     return new CHPromptCommand(cmd_s);
@@ -1299,12 +1304,6 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
   }
     return nullptr;
 }
-
-// void SmallShell::executeCommand(const char *cmd_line) {
-//   Command* cmd = CreateCommand(cmd_line);
-//   if(cmd) cmd->execute();
-// }
-
 
 void SmallShell::executeCommand(const char *cmd_line) {
   
