@@ -224,15 +224,15 @@ bool isInPATHEnvVar(const char* arg) {
 /**
 * check if the argument starts with "./" or "../" (simple exe/ exe in parent folder)
 */
-string isSimpleInDirectoryExe(const char* arg) {
+bool isSimpleInDirectoryExe(const char* arg) {
   string ptr = _trim(string(arg));
   if (ptr.rfind("./", 0) == 0) {
-    return ptr.substr(2);
+    return true;
   }
   else if (ptr.rfind("../", 0) == 0) {          // check if in parent folder
-    return ptr.substr(3);
+    return true;
   }
-  return "";
+  return false;
 }
 
 /**
@@ -911,8 +911,6 @@ void ExternalCommand::execute() {
 
   if (pid == 0) {  // Child process
     setpgrp();
-
-      string target = isSimpleInDirectoryExe(args[0]);
       if (containsWildcards(args)) {  // Handle wildcards with bash
       const char* bashPath = "/bin/bash";
       const char* const bashArgs[] = {bashPath, "-c", this->cmd_line.c_str(), nullptr};
@@ -926,12 +924,10 @@ void ExternalCommand::execute() {
       perror("smash error: execvp failed");
       exit(EXIT_FAILURE);
     }
-    else if(!target.empty()) {           //found a command that looks like an executable - check in directory or sub directories 
-      if (!target.empty()) {
-        execv(target.c_str(), args);
-        perror("smash error: execv failed");
-        exit(EXIT_FAILURE);
-      }
+    else if(isSimpleInDirectoryExe(args[0])) {           //found a command that looks like an executable
+      execv(args[0], args);
+      perror("smash error: execv failed");
+      exit(EXIT_FAILURE);
     }
     //none of the above
     cerr << "smash error: command not found: " << args[0] << endl;
