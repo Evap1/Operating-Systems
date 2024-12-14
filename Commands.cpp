@@ -897,8 +897,9 @@ void ExternalCommand::execute() {
     _removeBackgroundSign(ptr);
   }
 
-  char* args[COMMAND_MAX_ARGS + 1];
-  int numOfArgs = _parseCommandLine(ptr, args);
+  char* args[COMMAND_MAX_ARGS + 1];                                   // to be unaliased to send to execv 
+  string line = replaceAliased(this->cmd_line.c_str(), SmallShell::getInstance().alias_map);
+  int numOfArgs = _parseCommandLine(line.c_str(), args);
   if (!numOfArgs) return;
   
   args[COMMAND_MAX_ARGS] = nullptr;
@@ -943,7 +944,7 @@ void ExternalCommand::execute() {
   }
   else { // Parent and background
     // bye felicia
-    SmallShell::getInstance().getJobs()->addJob(this, pid);
+    SmallShell::getInstance().getJobs()->addJob(this, pid);           // sends the original command so itll print aliased version
   }
 
   for (int i = 0; i < numOfArgs; ++i) {
@@ -1330,7 +1331,7 @@ Command *SmallShell::CreateCommand(const char *cmd_line) {
     return new NetInfo(cmd_s);
   }
   else {
-    return new ExternalCommand(cmd_s);
+    return new ExternalCommand(cmd_line);
   }
     return nullptr;
 }
