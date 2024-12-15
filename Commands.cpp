@@ -1203,7 +1203,7 @@ void PipeCommand::execute() {
 
   pid_t pid2 = fork();
     if (pid2 == -1) {
-        perror("fork");
+        perror("smash error: fork failed");
         return;
     }
 
