@@ -1051,17 +1051,55 @@ WhoAmICommand::WhoAmICommand(const char *cmd_line) : Command(cmd_line){
   this->cmd_line = cmd_line;
 }
 void WhoAmICommand::execute() {
-  char *userEnv = getenv("USER");                       //contains username
-  if (!userEnv) {
-    perror("smash error: getenv failed");
+  int fd = open("/etc/passwd", O_RDONLY);                         //holds the info about all of the users in the pc
+  if (fd == -1) {
+    perror("smash error: open failed");
     return;
   }
-  char *homeEnv = getenv("HOME");                       //contains home directory of usename
-  if (!homeEnv) {
-    perror("smash error: getenv failed");
+
+  char buffer[BUF];
+  string fileContent;
+
+  ssize_t bytesRead;                                            // read the file content into a string
+  while ((bytesRead = read(fd, buffer, BUF)) > 0) {
+    fileContent.append(buffer, bytesRead);
+  }
+
+  if (bytesRead == -1) {
+    perror("smash error: read failed");
+    close(fd);
     return;
   }
-  cout << userEnv << " " << homeEnv << endl;
+
+  if (close(fd) == -1) {
+    perror("smash error: close failed");
+    return;
+  }
+
+  uid_t currentUid = getuid();                                          // Get the current user's UID
+
+  // Parse the content to find the user's entry
+  istringstream fileStream(fileContent);
+  string line;
+  while (getline(fileStream, line)) {
+    istringstream lineStream(line);
+    string user, x, uidStr, gid, comment, home, shell;
+
+    getline(lineStream, user, ':');  // Username
+    getline(lineStream, x, ':');     // Password (ignored)
+    getline(lineStream, uidStr, ':'); // User ID (ignored)
+    getline(lineStream, gid, ':');  // Group ID  (ignored)
+    getline(lineStream, comment, ':'); // Comment/Description (ignored)
+    getline(lineStream, home, ':');  // Home directory
+    getline(lineStream, shell, ':'); // Shell program (ignored)
+
+    // Check if the UID matches the current user's UID
+    if (static_cast<uid_t>(stoi(uidStr)) == currentUid) {
+      cout << user << " " << home << endl;
+      return;
+    }
+  }
+  cerr << "smash error: whoami failed" << endl;
 }
 
 /**---------------------------RedirectIOCommand---------------------------------*/
