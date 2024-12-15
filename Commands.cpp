@@ -1120,7 +1120,7 @@ void RedirectIOCommand::execute() {
   string firstArg = _trim(this->cmd_line.substr(0, redirectionPos));
   string thirdArg = _trim(this->cmd_line.substr(redirectionPos + arrow.length()));
 
-  if (!arrow.compare(">>")) {                                         // open with seek pointer in the end  
+  if (arrow.compare(">>") == 0) {                                         // open with seek pointer in the end  
     fileFD = open(thirdArg.c_str(), O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
   }
   else {                                                              // open with seek pointer at the start 
@@ -1133,7 +1133,7 @@ void RedirectIOCommand::execute() {
   }
 
   int oldSTDOUT = dup(STDOUT_FILENO);                             // duplicate the stdout file descriptor
-  if (oldSTDOUT == -1) { //if no stdout then how print before
+  if (oldSTDOUT == -1) {                                          //if no stdout then how print before
     perror("smash error: dup failed");
     close(fileFD);
     exit(EXIT_FAILURE);
@@ -1185,42 +1185,83 @@ void PipeCommand::execute() {
   pid_t pid1 = fork();
   if (pid1 == -1) {
     perror("smash error: fork failed");
+    close(pipeFd[0]);
+    close(pipeFd[1]);
     return;
   }
   
   if (pid1 == 0) {
     setpgrp();
     // executes command1
-    close(pipeFd[0]);                 // Close read end
-    if (pipeType.compare("|&") == 0) {
-      dup2(pipeFd[1], STDERR_FILENO); // Redirect stderr
-    } else {
-      dup2(pipeFd[1], STDOUT_FILENO); // Redirect stdout
+    if (close(pipeFd[0]) == -1) {                 // Close read end
+      perror("smash error: close failed");
+      close(pipeFd[1]);
+      exit(EXIT_FAILURE);
     }
-    close(pipeFd[1]);
+    if (pipeType.compare("|&") == 0) {            // Redirect stderr
+      if (dup2(pipeFd[1], STDERR_FILENO) == -1) {
+        perror("smash error: dup2 failed");
+        close(pipeFd[0]);
+        close(pipeFd[1]);
+        exit(EXIT_FAILURE);
+      }
+    } else {
+      if (dup2(pipeFd[1], STDOUT_FILENO) == -1) { // Redirect stdout
+        perror("smash error: dup2 failed");
+        close(pipeFd[0]);
+        close(pipeFd[1]);
+        exit(EXIT_FAILURE);
+      }
+    }
+    if (close(pipeFd[1]) == -1) {                 // Close write end
+      perror("smash error: close failed");
+      close(pipeFd[0]);
+      exit(EXIT_FAILURE);
+    }
     SmallShell::getInstance().executeCommand(firstCommand.c_str());
     exit(EXIT_SUCCESS);
   }
 
   pid_t pid2 = fork();
     if (pid2 == -1) {
-        perror("smash error: fork failed");
-        return;
+      perror("smash error: fork failed");
+      close(pipeFd[0]);
+      close(pipeFd[1]);
+      exit(EXIT_FAILURE);
     }
 
   if (pid2 == 0) {
     setpgrp();
     // executes command2
-    close(pipeFd[1]); // Close write end
-    dup2(pipeFd[0], STDIN_FILENO); // Redirect stdin
-
-    close(pipeFd[0]);
+    if (close(pipeFd[1]) == -1) {                 // Close write end
+      perror("smash error: close failed");
+      close(pipeFd[0]);
+      exit(EXIT_FAILURE);
+    }
+    if(dup2(pipeFd[0], STDIN_FILENO) == -1) {     // Redirect stdin
+      close(pipeFd[0]);
+      close(pipeFd[1]);
+      exit(EXIT_FAILURE);
+    }
+    if (close(pipeFd[0]) == -1) {                 // Close read end
+      perror("smash error: close failed");
+      close(pipeFd[1]);
+      exit(EXIT_FAILURE);
+    }
     SmallShell::getInstance().executeCommand(secondCommand.c_str());
     exit(EXIT_SUCCESS);
   }
   // father
-  close(pipeFd[0]);
-  close(pipeFd[1]);
+    if (close(pipeFd[0]) == -1) {                 // Close read end
+      perror("smash error: close failed");
+      close(pipeFd[1]);
+      exit(EXIT_FAILURE);
+    }
+    if (close(pipeFd[1]) == -1) {                 // Close write end
+      perror("smash error: close failed");
+      close(pipeFd[0]);
+      exit(EXIT_FAILURE);
+    }
 
   waitpid(pid1, nullptr, 0);
   waitpid(pid2, nullptr, 0);
