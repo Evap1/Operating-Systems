@@ -1,7 +1,9 @@
-alias s='sleep'
-alias ll='ls -l'
-alias a='ctd'
-unalias ll t s
-alias
-netinfo enp0s1
+sleep 1
+chprompt hello
+sleep 2
+sleep 3
+sleep 5&
+chprompt
+sleep 10&
+sleep 12
 quit kill

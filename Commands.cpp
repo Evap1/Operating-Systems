@@ -437,12 +437,12 @@ void KillCommand::execute() {
     return;
   }
   //else, job exists
+  cout << "signal number " << signal <<" was sent to pid " << job->getPID() << endl;
   if(kill(job->getPID(), signal) == -1){ //if failed to kill the job
     perror("smash error: kill failed");
     _argsFree(numOfArgs, args);
     return;
   }
-  cout << "signal number " << signal <<" was sent to pid " << job->getPID() << endl;
 
   jobs->removeFinishedJobs();           //if did not fail
   
@@ -517,11 +517,15 @@ void ChangeDirCommand::execute(){
 // C'tor:    aliasCommand(const char *cmd_line, map<string, string>& alias_map, set<string>& built_in_commands, list<pair<string, string>>& alias_list);
 
 aliasCommand::aliasCommand(const char *cmd_line, map<string, string>& alias_map,  set<string>& built_in_commands, list<pair<string, string>>& alias_list): BuiltInCommand(cmd_line),
-                                                                                                                                        cmd_line(cmd_line),
                                                                                                                                         alias_map(alias_map),
                                                                                                                                         built_in_commands(built_in_commands),
                                                                                                                                         alias_list(alias_list)                                                                                       
 {
+  this->cmd_line = cmd_line;
+  if (!this->cmd_line.empty() && this->cmd_line.back() == '&') {
+    this->cmd_line.pop_back();
+  }
+
 
 }
 
@@ -544,6 +548,7 @@ void aliasCommand::execute(){
   // in substr: first argument is where to start and 2nd argument how many chars to read
   string name = clean_command.substr(clean_command.find_first_of(" ") + 1, clean_command.find_first_of("=") - clean_command.find_first_of(" ") -1);
   string command = clean_command.substr(clean_command.find_first_of("=") + 1 );
+
   while(temp == true) {
     if(clean_command.find_first_of("=") == string::npos){
       cerr << "smash error: alias: invalid alias format" << endl;
@@ -652,10 +657,12 @@ string replaceAliased(const char *cmd_line, const map<string, string> map ){
     }
 
     // append remaining arguments from cmd_line 
-    for (int i = 1; i < argCount; ++i) {
-        replacedCommand += " ";           
-        replacedCommand += args[i];
+    string command = cmd_line;
+    if (argCount != 1){
+      replacedCommand.append(" ");
+      replacedCommand.append(command.substr(command.find_first_of(" ") + 1));
     }
+
     _argsFree(argCount, args);
     return replacedCommand;
   }
@@ -899,7 +906,7 @@ void ExternalCommand::execute() {
       exit(EXIT_FAILURE);
     }
     //none of the above
-    cerr << "smash error: command not found: " << args[0] << endl;
+    perror("smash error: External command failed");
     _argsFree(numOfArgs, args);
     exit(EXIT_FAILURE);
   }
@@ -1119,12 +1126,17 @@ void RedirectIOCommand::execute() {
 
   string firstArg = _trim(this->cmd_line.substr(0, redirectionPos));
   string thirdArg = _trim(this->cmd_line.substr(redirectionPos + arrow.length()));
+  if (!thirdArg.empty() && thirdArg.back() == '&') {
+    thirdArg.pop_back();
+  }
 
   if (arrow.compare(">>") == 0) {                                         // open with seek pointer in the end  
-    fileFD = open(thirdArg.c_str(), O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    fileFD = open(thirdArg.c_str(), O_WRONLY | O_CREAT | O_APPEND,
+                  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
   }
   else {                                                              // open with seek pointer at the start 
-    fileFD = open(thirdArg.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    fileFD = open(thirdArg.c_str(), O_WRONLY | O_CREAT | O_TRUNC,
+                  S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
   }
 
   if (fileFD == -1) { // if no file me sad
@@ -1323,7 +1335,9 @@ JobsList::JobEntry *SmallShell::tail()
 Command *SmallShell::CreateCommand(const char *cmd_line) {
   SmallShell &smash = SmallShell::getInstance();
   char* args[COMMAND_MAX_ARGS];
+
   string line = replaceAliased(cmd_line, smash.alias_map);     //for some reason doesnt want to parse a const smh
+
   int numOfArgs = _parseCommandLine(line.c_str(), args);
   if (!numOfArgs) return nullptr;
   
@@ -1390,17 +1404,12 @@ void SmallShell::executeCommand(const char *cmd_line) {
   
   this->jobs->removeFinishedJobs();
 
-  Command* cmd;
+  Command* cmd = CreateCommand(cmd_line);
 
-  try {
-    cmd = CreateCommand(cmd_line);
-  } 
-  catch (const exception &e) {
-        perror("smash error: memory allocation failed");
-        return;
+  if(cmd) {
+    cmd->execute();
   }
 
-  if(cmd) cmd->execute();
 }
 
 

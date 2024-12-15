@@ -1,7 +1,1 @@
-smash> smash> smash> smash> smash> s='sleep'
-a='ctd'
-smash> IP Address: 192.168.64.3
-Subnet Mask: 255.255.255.0
-Default Gateway: 192.168.64.1
-DNS Servers: 127.0.0.53
-smash> smash: sending SIGKILL signal to 0 jobs:
+smash> smash> hello> hello> hello> hello> smash> smash> smash> smash: sending SIGKILL signal to 0 jobs:
