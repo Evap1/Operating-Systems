@@ -972,7 +972,7 @@ void ListDirCommand::execute() {
 */
 void ListDirCommand::listDirectory(int dir_fd, const string& path, int indent_level) {
     char buffer[BUF];
-    struct stat entry_stat;     // metadata about a file or directory.
+    struct stat curr_stat;     // metadata about a file or directory.
     vector<string> dirs;
     vector<string> files;
 
@@ -992,14 +992,14 @@ void ListDirCommand::listDirectory(int dir_fd, const string& path, int indent_le
             string full_path = path + "/" + name;
 
             // use stat to check if the entry is a file or directory
-            if (stat(full_path.c_str(), &entry_stat) == -1) {
+            if (stat(full_path.c_str(), &curr_stat) == -1) {
                 perror("smash error: stat failed");
                 current += dirent->d_reclen;     // d_reclen: length of the current entry
                 continue;
             }
 
             // sort files and dirs
-            if (S_ISREG(entry_stat.st_mode)) {
+            if (S_ISREG(curr_stat.st_mode)) {
                 files.push_back(name);
             } 
             else {
@@ -1021,7 +1021,7 @@ void ListDirCommand::listDirectory(int dir_fd, const string& path, int indent_le
 
     // print dirs first
     for (const auto& dir : dirs) {
-        for (int i = 0; i < indent_level; ++i){
+        for (int i = 0; i < indent_level; i++){
           cout << "\t";
         } 
         cout << dir << endl;
@@ -1039,7 +1039,9 @@ void ListDirCommand::listDirectory(int dir_fd, const string& path, int indent_le
 
     // print files
     for (const auto& file : files) {
-        for (int i = 0; i < indent_level; ++i) cout << "\t";
+        for (int i = 0; i < indent_level; i++) {
+          cout << "\t";
+        }
         cout << file << endl;
     }
     return;
@@ -1171,7 +1173,6 @@ void PipeCommand::execute() {
 
   string pipeType = get<0>(this->position);
   size_t redirectionPos = get<1>(this->position);
-
   string firstCommand = _trim(this->cmd_line.substr(0, redirectionPos));
   string secondCommand = _trim(this->cmd_line.substr(redirectionPos + pipeType.length()));
 
@@ -1191,7 +1192,7 @@ void PipeCommand::execute() {
     setpgrp();
     // executes command1
     close(pipeFd[0]);                 // Close read end
-    if (!pipeType.compare("|&")) {
+    if (pipeType.compare("|&") == 0) {
       dup2(pipeFd[1], STDERR_FILENO); // Redirect stderr
     } else {
       dup2(pipeFd[1], STDOUT_FILENO); // Redirect stdout
@@ -1212,6 +1213,7 @@ void PipeCommand::execute() {
     // executes command2
     close(pipeFd[1]); // Close write end
     dup2(pipeFd[0], STDIN_FILENO); // Redirect stdin
+
     close(pipeFd[0]);
     SmallShell::getInstance().executeCommand(secondCommand.c_str());
     exit(EXIT_SUCCESS);
