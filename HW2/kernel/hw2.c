@@ -4,9 +4,9 @@
 #include <linux/sched.h>
 #include <linux/pid.h>    	// for finding pid
 
-#define SWORD_CLEARANCE    0x1
+#define SWORD_CLEARANCE    0x4
 #define MIDNIGHT_CLEARANCE 0x2
-#define CLAMP_CLEARANCE    0x4
+#define CLAMP_CLEARANCE    0x1
 
 asmlinkage long sys_hello(void) {
 	printk("Hello, World!\n");
