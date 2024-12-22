@@ -80,10 +80,6 @@ asmlinkage long sys_check_sec(pid_t pid, char clr) {
         return -EINVAL;
 	}
 
-	if ((curr_task->clearance_mode & clearance) == 0) {		// check if calling process has correct clearance
-		return -EPERM;
-	}
-
 	rcu_read_lock();			// start critical section
 	
 	task = find_task_by_vpid(pid);
