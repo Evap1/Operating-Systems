@@ -94,7 +94,7 @@ asmlinkage long sys_check_sec(pid_t pid, char clr) {
 	}
 
 	rcu_read_unlock();			// stop critical section
-	return 1;
+	return (task->clearance_mode & clearance) != 0;
 }
 
 asmlinkage long sys_set_sec_branch(int height, char clr) {
