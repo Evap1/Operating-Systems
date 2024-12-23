@@ -27,13 +27,13 @@ asmlinkage long sys_set_sec(int sword, int midnight, int clamp) {
 
 	task->clearance_mode = 0;						//clear before applying the clearance
 
-	if (sword >= 1) {		// lsb
+	if (sword >= 1) {		// "msb"
 		task->clearance_mode |= SWORD_CLEARANCE;
 	}
 	if (midnight >= 1) {
 		task->clearance_mode |= MIDNIGHT_CLEARANCE;
 	}
-	if (clamp >= 1) {		//"msb"
+	if (clamp >= 1) {		// lsb
 		task->clearance_mode |= CLAMP_CLEARANCE;
 	}
 
@@ -88,7 +88,7 @@ asmlinkage long sys_check_sec(pid_t pid, char clr) {
 		return -ESRCH;
 	}
 
-	if ((task->clearance_mode & clearance) == 0) {
+	if ((curr_task->clearance_mode & clearance) == 0) {	// check if calling process has correct clearance
 		rcu_read_unlock();		// stop critical section
 		return -EPERM;
 	}
