@@ -104,7 +104,7 @@ asmlinkage long sys_set_sec_branch(int height, char clr) {
 	int clearance, num_of_changed_parents = 0;
 
 	// check if height is valid - greater than 0
-	if (height < 0) {
+	if (height <= 0) {
 		return -EINVAL;
 	}
 
