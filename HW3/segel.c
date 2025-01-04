@@ -107,7 +107,8 @@ ssize_t Read(int fd, void *buf, size_t count)
 {
     ssize_t rc;
 
-    if ((rc = read(fd, buf, count)) < 0) 
+    if ((rc = 
+    (fd, buf, count)) < 0) 
         unix_error("Read error");
     return rc;
 }
@@ -132,7 +133,7 @@ off_t Lseek(int fildes, off_t offset, int whence)
 
 void Close(int fd) 
 {
-    int rc;
+    int rc; 
 
     if ((rc = close(fd)) < 0)
         unix_error("Close error");
@@ -227,7 +228,7 @@ void Listen(int s, int backlog)
 int Accept(int s, struct sockaddr *addr, socklen_t *addrlen) 
 {
     int rc;
-
+    
     if ((rc = accept(s, addr, addrlen)) < 0)
         unix_error("Accept error");
     return rc;

@@ -5,13 +5,6 @@
 #include "segel.h"
 #include "request.h"
 
-typedef struct Threads_stats{
-	int id;
-	int stat_req;
-	int dynm_req;
-	int total_req;
-} * threads_stats;
-
 // requestError(      fd,    filename,        "404",    "Not found", "OS-HW3 Server could not find this file");
 void requestError(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
 {
@@ -197,13 +190,16 @@ void requestServeStatic(int fd, char *filename, int filesize, struct timeval arr
 }
 
 //  Returns True/False if realtime event
-bool getRequestMetaData(int fd /*, int* est* for future use ignore this*/)
+int getRequestMetaData(int fd /*, int* est* for future use ignore this*/)
 {
-	char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
-	Rio_readinitb(&rio, fd);
-	Rio_readlineb(&rio, buf, MAXLINE);
-	sscanf(buf, "%s %s %s", method, uri, version);
-	bool isRealTime = !strcasecmp(method, "REAL");
+	char buf[MAXLINE], method[MAXLINE];
+	int bytesRead  = recv(fd, buf, MAXLINE - 1, MSG_PEEK);
+	 if (bytesRead == -1) {
+		perror("recv");
+		return 1;
+	 }
+	sscanf(buf, "%s ", method);
+	int isRealTime = !strcasecmp(method, "REAL");
 	// char* timepointer; 
 	// if (timepointer = strstr(uri, "est=")) {
 	// 	*est = atoi(timepointer+4);

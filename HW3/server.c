@@ -21,9 +21,9 @@ void getargs(int *port, int argc, char *argv[])
     *port = atoi(argv[1]);
 }
 
-
 int main(int argc, char *argv[])
 {
+
     int listenfd, connfd, port, clientlen;
     struct sockaddr_in clientaddr;
 
@@ -37,18 +37,18 @@ int main(int argc, char *argv[])
     while (1) {
 	clientlen = sizeof(clientaddr);
 	connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
-
 	// 
 	// HW3: In general, don't handle the request in the main thread.
 	// Save the relevant info in a buffer and have one of the worker threads 
 	// do the work. 
 	// 
-	requestHandle(connfd);
+	//requestHandle(connfd);
 
 	Close(connfd);
     }
 
 }
+
 
 
     
