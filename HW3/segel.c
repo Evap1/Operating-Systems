@@ -107,8 +107,7 @@ ssize_t Read(int fd, void *buf, size_t count)
 {
     ssize_t rc;
 
-    if ((rc = 
-    (fd, buf, count)) < 0) 
+    if ((rc = (fd, buf, count)) < 0) 
         unix_error("Read error");
     return rc;
 }

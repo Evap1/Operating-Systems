@@ -32,7 +32,23 @@ int main(int argc, char *argv[])
     // 
     // HW3: Create some threads...
     //
+    // piazza fix :
+    struct timeval arrival, dispatch;
+    threads_stats t_stats = (threads_stats)malloc(sizeof(struct Threads_stats));
 
+    // pupper init just for fixing the bug
+    // student code should init it properly by the thread
+    // should read about timeval and see the def of the t_stats struct
+    t_stats->id = 0;
+    t_stats->stat_req = 0;
+    t_stats->dynm_req = 0;
+    t_stats->total_req = 0;
+    arrival.tv_sec = 0;
+    arrival.tv_usec = 0;
+    dispatch.tv_sec = 0;
+    dispatch.tv_usec =0;
+
+    // segel code from now on:
     listenfd = Open_listenfd(port);
     while (1) {
 	clientlen = sizeof(clientaddr);
@@ -41,9 +57,10 @@ int main(int argc, char *argv[])
 	// HW3: In general, don't handle the request in the main thread.
 	// Save the relevant info in a buffer and have one of the worker threads 
 	// do the work. 
-	// 
+	// was: 
 	//requestHandle(connfd);
-
+    // piazza pix:
+    requestHandle(connfd, arrival, dispatch, t_stats);
 	Close(connfd);
     }
 
