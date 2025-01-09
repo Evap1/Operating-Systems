@@ -25,6 +25,7 @@
 
 /*
  * Send an HTTP request for the specified file 
+ Eva : static req
  */
 void clientSend(int fd, char *filename, char* method)
 {

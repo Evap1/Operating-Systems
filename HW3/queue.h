@@ -1,29 +1,34 @@
+#ifndef QUEUE_H
+#define QUEUE_H
+
 #include <stdbool.h>
 #include <sys/time.h>
 
 typedef struct Queue *Queue;
-typedef struct Node *Node;
+typedef struct Request *Request;
 
-Node node_create(int value, struct timeval arrival);
+Request requestCreate(int descriptor, struct timeval arrival);
 
-Queue queue_create(int size);
+Queue queueCreate(int size);
 
-int queue_size(Queue q);
+int queueSize(Queue q);
 
-bool queue_full(Queue q);
+bool queueFull(Queue q);
 
-bool queue_empty(Queue q);
+bool queueEmpty(Queue q);
 
 void enqueue(Queue q, int value, struct timeval arrival);
 
-struct timeval queue_head_arrival_time(Queue q);
+struct timeval queue_headArrivalTime(Queue q);
 
 int dequeue(Queue q);
 
-int queue_find(Queue q, int value);
+int queueFindReq(Queue q, int value);
 
-int dequeue_index(Queue q, int index);
+int dequeueByIndex(Queue q, int index);
 
-void queue_destroy(Queue q);
+void queueDestroy(Queue q);
 
-void queue_print(Queue q);
+void queuePrint(Queue q);
+
+#endif // QUEUE_H

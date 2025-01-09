@@ -1,30 +1,32 @@
 #include <stdio.h>
 #include "queue.h"
-
 #include <stdlib.h>
 
-struct Node {
-    int data;
+struct Request {
+    int descriptor;
     struct timeval arrival;
-    Node next;
+    Request next;
 };
 
 struct Queue {
     int max_size;
     int current_size;
-    Node head;
-    Node tail;
+    Request head;
+    Request tail;
 };
 
-Node node_create(int value, struct timeval arrival){
-    Node node = (Node)malloc(sizeof(Node*));
-    node->data = value;
+// Given a descriptor, create a new request
+// helper function
+Request requestCreate(int descriptor, struct timeval arrival){
+    Request node = (Request)malloc(sizeof(*node));
+    node->descriptor = descriptor;
     node->arrival = arrival;
     node->next = NULL;
     return node;
 }
 
-Queue queue_create(int size){
+// Create empty queue of max_size = size
+Queue queueCreate(int size){
     Queue q = (Queue)malloc(sizeof(Queue*));
     q->head = NULL;
     q->tail = NULL;
@@ -33,23 +35,29 @@ Queue queue_create(int size){
     return q;
 }
 
-bool queue_full(Queue queue){
+// return true if the currect queue is full
+// helper function
+bool queueFull(Queue queue){
     if(queue->current_size == queue->max_size)
         return true;
     else
         return false;
 }
 
-bool queue_empty(Queue queue){
+// return true if the currect queue is empty
+// helper function
+bool queueEmpty(Queue queue){
     return queue->current_size == 0;
 }
 
-void enqueue(Queue q, int value, struct timeval arrival){
-    if(queue_full(q))
+// add new request to queue, if full does nothing
+// function to use queue
+void enqueue(Queue q, int descriptor, struct timeval arrival){
+    if(queueFull(q))
         return;
 
-    Node new_node = node_create(value, arrival);
-    if(queue_empty(q)){
+    Request new_node = requestCreate(descriptor, arrival);
+    if(queueEmpty(q)){
         q->head = new_node;
         q->tail = new_node;
     } else {
@@ -59,66 +67,70 @@ void enqueue(Queue q, int value, struct timeval arrival){
     q->current_size++;
 }
 
-struct timeval queue_head_arrival_time(Queue q){
-    if(queue_empty(q))
+// pop head request and return it's descriptor, if empty, returns -1.
+// function to use queue
+int dequeue(Queue q){
+    if(queueEmpty(q))
+        return -1;
+    Request new_head = q->head->next;
+    int descriptor = q->head->descriptor;
+    free(q->head);
+    if(new_head == NULL){
+        q->head = NULL;
+        q->tail = NULL;
+    } else {
+        q->head = new_head;
+    }
+    q->current_size--;
+    return descriptor;
+}
+
+// return time of arrival of head request (first added), if empty returns 0
+struct timeval queueHeadArrivalTime(Queue q){
+    if(queueEmpty(q))
         return (struct timeval){0};
     return q->head->arrival;
 }
 
-int dequeue(Queue q){
-    if(queue_empty(q))
+// return the index in queue of request, if not found or empty return -1.
+int queueFindReq(Queue q, int descriptor){
+    if(queueEmpty(q))
         return -1;
-    Node temp = q->head->next;
-    int value = q->head->data;
-    free(q->head);
-    if(temp == NULL){
-        q->head = NULL;
-        q->tail = NULL;
-    } else {
-        q->head = temp;
-    }
-    q->current_size--;
-    return value;
-}
-
-int queue_find(Queue q, int value){
-    if(queue_empty(q))
-        return -1;
-    Node temp = q->head;
+    Request temp = q->head;
     int index = 0;
     while(temp){
-        if(value == temp->data){
+        if(descriptor == temp->descriptor){
             return index;
         }
         index++;
         temp = temp->next;
     }
-
     return -1;
 }
 
-int dequeue_index(Queue q, int index){
-    if(queue_empty(q))
+// pop request in the given index, if empty or invalid index return -1, else return the descriptor of the request
+int dequeueByIndex(Queue q, int index){
+    if(queueEmpty(q))
         return -1;
 
-    if(index < 0 || index >= queue_size(q))
+    if(index < 0 || index >= queueSize(q))
         return -1;
 
     if(index == 0){
         return dequeue(q);
     }
 
-    Node node_to_dequeue = q->head;
-    Node prev_node = NULL;
+    Request node_to_dequeue = q->head;
+    Request prev_node = NULL;
     for(int i = 0; i < index; i++){
         prev_node = node_to_dequeue;
         node_to_dequeue = node_to_dequeue->next;
     }
 
-    int value = node_to_dequeue->data;
+    int value = node_to_dequeue->descriptor;
     prev_node->next = node_to_dequeue->next;
     free(node_to_dequeue);
-    if(index == queue_size(q) - 1){
+    if(index == queueSize(q) - 1){
         q->tail = prev_node;
     }
     q->current_size--;
@@ -126,13 +138,13 @@ int dequeue_index(Queue q, int index){
     return value;
 }
 
-int queue_size(Queue q){
+int queueSize(Queue q){
     return q->current_size;
 }
 
-void queue_destroy(Queue q){
-    Node current = q->head;
-    Node next = NULL;
+void queueDestroy(Queue q){
+    Request current = q->head;
+    Request next = NULL;
     while (current){
         next = current->next;
         free(current);
@@ -143,16 +155,30 @@ void queue_destroy(Queue q){
 }
 
 void debug(Queue q){
-    if (queue_empty(q)){
+    if (queueEmpty(q)){
         printf("Queue is empty\n");
         return;
     }
 
-    Node temp = q->head;
+    Request temp = q->head;
     while (temp){
-        printf("%d ", temp->data);
+        printf("%d ", temp->descriptor);
         temp = temp->next;
     }
     printf("\n");
 }
 
+void queuePrint(Queue q){
+    if (queueEmpty(q)){
+        printf("Queue is empty\n");
+        return;
+    }
+
+    printf("Queue (size: %d/%d): ", q->current_size, q->max_size);
+    Request temp = q->head;
+    while (temp){
+        printf("[Descriptor: %d | Arrival: %ld.%06ld] -> ", temp->descriptor, temp->arrival.tv_sec, temp->arrival.tv_usec);
+        temp = temp->next;
+    }
+    printf("NULL\n");
+}
