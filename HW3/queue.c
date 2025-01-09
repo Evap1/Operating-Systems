@@ -85,6 +85,12 @@ int dequeue(Queue q){
     return descriptor;
 }
 
+int headDesciprot(Queue q){
+    if(queueEmpty(q))
+        return -1;
+    return q->head->descriptor;
+}
+
 // return time of arrival of head request (first added), if empty returns 0
 struct timeval queueHeadArrivalTime(Queue q){
     if(queueEmpty(q))
@@ -106,6 +112,15 @@ int queueFindReq(Queue q, int descriptor){
         temp = temp->next;
     }
     return -1;
+}
+
+// pop request with the given descriptor
+void dequeueByReq(Queue q, int descriptor){
+    int index = queueFindReq(q, descriptor);
+    if (index == -1) {
+        return;
+    }
+    dequeueByIndex(q, index);
 }
 
 // pop request in the given index, if empty or invalid index return -1, else return the descriptor of the request

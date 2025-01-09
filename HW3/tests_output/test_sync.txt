@@ -1,0 +1,63 @@
+[WORKER] Waiting for a request... Current Queue Size: 0
+[WORKER] Waiting for a request... Current Queue Size: 0
+[WORKER] Waiting for a request... Current Queue Size: 0
+[VIP] Waiting for VIP request... Current Queue Size: 0
+[WORKER] Waiting for a request... Current Queue Size: 0
+[MASTER] New VIP request! Notifying VIP thread.
+[WORKER] woeker allowed, working queue: (4/5)
+[WORKER] VIP request is pending. Blocking worker thread.
+[WORKER] woeker allowed, working queue: (4/5)
+[WORKER] VIP request is pending. Blocking worker thread.
+[VIP] Processing VIP request 6, queue size: 1
+[MASTER] Queue full! Waiting for space... (5/5)
+REAL /home.html HTTP/1.1
+[VIP] Waiting for VIP request... Current Queue Size: 0
+[WORKER] woeker allowed, working queue: (4/5)
+[WORKER] Processing request 4, queue size: 1
+[MASTER] Resumed after waiting 5.004160 seconds.
+[MASTER] Queue full! Waiting for space... (5/5)
+[WORKER] woeker allowed, working queue: (5/5)
+[WORKER] Processing request 5, queue size: 2
+[WORKER] woeker allowed, working queue: (5/5)
+[WORKER] Processing request 7, queue size: 3
+[WORKER] woeker allowed, working queue: (5/5)
+[WORKER] Processing request 8, queue size: 4
+GET /home.html HTTP/1.1
+[WORKER] Waiting for a request... Current Queue Size: 1
+[WORKER] Processing request 9, queue size: 4
+[MASTER] Resumed after waiting 5.003533 seconds.
+[MASTER] New VIP request! Notifying VIP thread.
+[MASTER] Queue full! Waiting for space... (5/5)
+[VIP] Processing VIP request 6, queue size: 1
+GET /home.html HTTP/1.1
+[WORKER] Waiting for a request... Current Queue Size: 0
+[WORKER] VIP request is pending. Blocking worker thread.
+GET /home.html HTTP/1.1
+[MASTER] Resumed after waiting 0.011759 seconds.
+[MASTER] Queue full! Waiting for space... (5/5)
+[WORKER] Waiting for a request... Current Queue Size: 0
+[WORKER] VIP request is pending. Blocking worker thread.
+GET /home.html HTTP/1.1
+[MASTER] Resumed after waiting 0.039203 seconds.
+[MASTER] Queue full! Waiting for space... (5/5)
+[WORKER] Waiting for a request... Current Queue Size: 1
+[WORKER] VIP request is pending. Blocking worker thread.
+[MASTER] Resumed after waiting 0.007524 seconds.
+GET /home.html HTTP/1.1
+[WORKER] Waiting for a request... Current Queue Size: 1
+[WORKER] VIP request is pending. Blocking worker thread.
+REAL /home.html HTTP/1.1
+[VIP] Waiting for VIP request... Current Queue Size: 2
+[VIP] Processing VIP request 4, queue size: 2
+REAL /home.html HTTP/1.1
+[VIP] Waiting for VIP request... Current Queue Size: 1
+[VIP] Processing VIP request 7, queue size: 1
+REAL /home.html HTTP/1.1
+[VIP] Waiting for VIP request... Current Queue Size: 0
+[WORKER] woeker allowed, working queue: (1/5)
+[WORKER] Processing request 10, queue size: 1
+[WORKER] woeker allowed, working queue: (1/5)
+[WORKER] woeker allowed, working queue: (1/5)
+[WORKER] woeker allowed, working queue: (1/5)
+GET /home.html HTTP/1.1
+[WORKER] Waiting for a request... Current Queue Size: 0

@@ -1,5 +1,11 @@
 #include "tests.h"
 #include "queue.h"
+#include <pthread.h>
+#include <unistd.h>
+#include "segel.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 void runQueueTests() {
     struct timeval time1, time2, time3;
@@ -56,6 +62,7 @@ void runQueueTests() {
     printf("\nDestroying queue...\n");
     queueDestroy(q);
 }
+
 
 int main(){
     runQueueTests();

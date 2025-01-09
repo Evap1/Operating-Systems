@@ -1,0 +1,165 @@
+
+=== Running Automated Server Tests ===
+clientfd = 3
+[TEST] Sending GET request: /home.html
+Sending: GET /home.html HTTP/1.1
+host: pc
+
+
+clientfd = 10
+[TEST] Sending REAL request: /home.html
+Sending: REAL /home.html HTTP/1.1
+host: pc
+
+
+clientfd = 5
+[TEST] Sending GET request: /home.html
+Sending: GET /home.html HTTP/1.1
+host: pc
+
+
+clientfd = 4
+[TEST] Sending GET request: /home.html
+Sending: GET /home.html HTTP/1.1
+host: pc
+
+
+clientfd = 11
+[TEST] Sending GET request: /home.html
+Sending: GET /home.html HTTP/1.1
+host: pc
+
+
+clientfd = 7
+[TEST] Sending GET request: /home.html
+Sending: GET /home.html HTTP/1.1
+host: pc
+
+
+clientfd = 8
+[TEST] Sending REAL request: /home.html
+Sending: REAL /home.html HTTP/1.1
+host: pc
+
+
+clientfd = 6
+[TEST] Sending REAL request: /home.html
+Sending: REAL /home.html HTTP/1.1
+host: pc
+
+
+clientfd = 9
+[TEST] Sending REAL request: /home.html
+Sending: REAL /home.html HTTP/1.1
+host: pc
+
+
+clientfd = 12
+[TEST] Sending GET request: /home.html
+Sending: GET /home.html HTTP/1.1
+host: pc
+
+
+Header: HTTP/1.0 200 OK
+Header: Server: OS-HW3 Web Server
+Header: Content-Length: 293
+Header: Content-Type: text/html
+Header: Stat-Req-Arrival:: 0.000000
+Header: Stat-Req-Dispatch:: 0.000000
+Header: Stat-Thread-Id:: 0
+Header: Stat-Thread-Count:: 0
+Header: Stat-Thread-Static:: 1
+Header: Stat-Thread-Dynamic:: 0
+Header: HTTP/1.0 200 OK
+Header: Server: OS-HW3 Web Server
+Header: Content-Length: 293
+Header: Content-Type: text/html
+Header: Stat-Req-Arrival:: 0.000000
+Header: Stat-Req-Dispatch:: 0.000000
+Header: Stat-Thread-Id:: 0
+Header: Stat-Thread-Count:: 0
+Header: Stat-Thread-Static:: 1
+Header: Stat-Thread-Dynamic:: 0
+Header: HTTP/1.0 200 OK
+Header: Server: OS-HW3 Web Server
+Header: Content-Length: 293
+Header: Content-Type: text/html
+Header: Stat-Req-Arrival:: 0.000000
+Header: Stat-Req-Dispatch:: 0.000000
+Header: Stat-Thread-Id:: 0
+Header: Stat-Thread-Count:: 0
+Header: Stat-Thread-Static:: 1
+Header: Stat-Thread-Dynamic:: 0
+Header: HTTP/1.0 200 OK
+Header: Server: OS-HW3 Web Server
+Header: Content-Length: 293
+Header: Content-Type: text/html
+Header: Stat-Req-Arrival:: 0.000000
+Header: Stat-Req-Dispatch:: 0.000000
+Header: Stat-Thread-Id:: 0
+Header: Stat-Thread-Count:: 0
+Header: Stat-Thread-Static:: 1
+Header: Stat-Thread-Dynamic:: 0
+Header: HTTP/1.0 200 OK
+Header: Server: OS-HW3 Web Server
+Header: Content-Length: 293
+Header: Content-Type: text/html
+Header: Stat-Req-Arrival:: 0.000000
+Header: Stat-Req-Dispatch:: 0.000000
+Header: Stat-Thread-Id:: 0
+Header: Stat-Thread-Count:: 0
+Header: Stat-Thread-Static:: 1
+Header: Stat-Thread-Dynamic:: 0
+Header: HTTP/1.0 200 OK
+Header: Server: OS-HW3 Web Server
+Header: Content-Length: 293
+Header: Content-Type: text/html
+Header: Stat-Req-Arrival:: 0.000000
+Header: Stat-Req-Dispatch:: 0.000000
+Header: Stat-Thread-Id:: 0
+Header: Stat-Thread-Count:: 0
+Header: Stat-Thread-Static:: 1
+Header: Stat-Thread-Dynamic:: 0
+Header: HTTP/1.0 200 OK
+Header: Server: OS-HW3 Web Server
+Header: Content-Length: 293
+Header: Content-Type: text/html
+Header: Stat-Req-Arrival:: 0.000000
+Header: Stat-Req-Dispatch:: 0.000000
+Header: Stat-Thread-Id:: 0
+Header: Stat-Thread-Count:: 0
+Header: Stat-Thread-Static:: 1
+Header: Stat-Thread-Dynamic:: 0
+Header: HTTP/1.0 200 OK
+Header: Server: OS-HW3 Web Server
+Header: Content-Length: 293
+Header: Content-Type: text/html
+Header: Stat-Req-Arrival:: 0.000000
+Header: Stat-Req-Dispatch:: 0.000000
+Header: Stat-Thread-Id:: 0
+Header: Stat-Thread-Count:: 0
+Header: Stat-Thread-Static:: 1
+Header: Stat-Thread-Dynamic:: 0
+Header: HTTP/1.0 200 OK
+Header: Server: OS-HW3 Web Server
+Header: Content-Length: 293
+Header: Content-Type: text/html
+Header: Stat-Req-Arrival:: 0.000000
+Header: Stat-Req-Dispatch:: 0.000000
+Header: Stat-Thread-Id:: 0
+Header: Stat-Thread-Count:: 0
+Header: Stat-Thread-Static:: 1
+Header: Stat-Thread-Dynamic:: 0
+Header: HTTP/1.0 200 OK
+Header: Server: OS-HW3 Web Server
+Header: Content-Length: 293
+Header: Content-Type: text/html
+Header: Stat-Req-Arrival:: 0.000000
+Header: Stat-Req-Dispatch:: 0.000000
+Header: Stat-Thread-Id:: 0
+Header: Stat-Thread-Count:: 0
+Header: Stat-Thread-Static:: 1
+Header: Stat-Thread-Dynamic:: 0
+
+✅ [TEST] All client requests completed successfully.
+

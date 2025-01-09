@@ -213,6 +213,7 @@ int getRequestMetaData(int fd /*, int* est* for future use ignore this*/)
 // handle a request
 void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
 {
+	sleep(5); //EVA
 	int is_static;
 	struct stat sbuf;
 	char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
