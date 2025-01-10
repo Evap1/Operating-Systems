@@ -211,9 +211,9 @@ int getRequestMetaData(int fd /*, int* est* for future use ignore this*/)
 
 
 // handle a request
-void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
+int requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
 {
-	sleep(5); //EVA
+//	sleep(5); //EVA
 	int is_static;
 	struct stat sbuf;
 	char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
@@ -225,10 +225,17 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
 	sscanf(buf, "%s %s %s", method, uri, version);
 	printf("%s %s %s\n", method, uri, version);
 
+    // Check for .skip
+    int skipInvoked = 0;
+    if (strstr(filename, ".skip") != NULL) {
+        skipInvoked = 1;
+        // Remove ".skip" from filename
+        *strstr(filename, ".skip") = '\0';
+    }
 
 	if (strcasecmp(method, "GET") && strcasecmp(method, "REAL")) {
 		requestError(fd, method, "501", "Not Implemented", "OS-HW3 Server does not implement this method", arrival, dispatch, t_stats);
-		return;
+		return skipInvoked;
 	}
 
 	requestReadhdrs(&rio);
@@ -236,22 +243,24 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
 	is_static = requestParseURI(uri, filename, cgiargs);
 	if (stat(filename, &sbuf) < 0) {
 		requestError(fd, filename, "404", "Not found", "OS-HW3 Server could not find this file", arrival, dispatch, t_stats);
-		return;
+		return skipInvoked;
 	}
 
 	if (is_static) {
 		if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
 			requestError(fd, filename, "403", "Forbidden", "OS-HW3 Server could not read this file", arrival, dispatch, t_stats);
-			return;
+			return skipInvoked;
 		}
 		(t_stats->stat_req)++;
 		requestServeStatic(fd, filename, sbuf.st_size, arrival, dispatch, t_stats);
 	} else {
 		if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
 			requestError(fd, filename, "403", "Forbidden", "OS-HW3 Server could not run this CGI program", arrival, dispatch, t_stats);
-			return;
+			return skipInvoked;
 		}
 		(t_stats->dynm_req)++;
 		requestServeDynamic(fd, filename, cgiargs, arrival, dispatch, t_stats);
 	}
+
+	return skipInvoked;
 }

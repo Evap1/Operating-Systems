@@ -23,6 +23,8 @@ struct timeval queueHeadArrivalTime(Queue q);
 
 int dequeue(Queue q);
 
+int skipDequeue(Queue q);
+
 int headDesciprot(Queue q);
 
 int queueFindReq(Queue q, int value);

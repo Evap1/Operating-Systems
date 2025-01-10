@@ -85,6 +85,17 @@ int dequeue(Queue q){
     return descriptor;
 }
 
+// pop the latest request == the last in queue
+// if empty, return -1.
+int skipDequeue(Queue q){
+    if (queueEmpty(q)){
+        return -1;
+    }
+
+    int last_index = queueSize(q) - 1;
+    return dequeueByIndex(q , last_index);
+}
+
 int headDesciprot(Queue q){
     if(queueEmpty(q))
         return -1;
