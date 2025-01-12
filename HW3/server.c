@@ -244,7 +244,7 @@ void *workerThread(int *thread_number)
 void *vipThread(int *thread_number)
 {
     // TODO: make sure these variables are local and not shared through threads
-    struct timeval arrival, started, dispatch; // TO BE MODIFIEF !!! JUST TO COMPILE FOR ENQUEUE
+    struct timeval arrival, started, dispatch;
     threads_stats t_stats = (threads_stats)malloc(sizeof(struct Threads_stats));
 
     // Thread ID
