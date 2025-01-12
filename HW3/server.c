@@ -22,7 +22,7 @@ void *workerThread(int *thread_number);
 void *vipThread(int *thread_number);
 void getargs(int *port, int *threads_num, int *queue_size, char *policy, int argc, char *argv[]);
 int totalReqInQueue();
-bool isValidPolicy(char *policy);
+int isValidPolicy(char *policy);
 
 // GLOBALS
 Queue handeling_requests, waiting_requests, vip_waiting_requests;
@@ -296,16 +296,16 @@ void *vipThread(int *thread_number)
     }
 }
 
-bool isValidPolicy(char *policy)
+int isValidPolicy(char *policy)
 {
     for (int i = 0; i < NUM_OF_POLICIES; i++)
     {
         if (strcmp(common_policies[i], policy) == 0)
         {
-            return true;
+            return 1;
         }
     }
-    return false;
+    return 0;
 }
 
 void getargs(int *port, int *threads_num, int *queue_size, char *policy, int argc, char *argv[])

@@ -1,7 +1,6 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
-#include <stdbool.h>
 #include <sys/time.h>
 
 typedef struct Queue *Queue;
@@ -13,9 +12,9 @@ Queue queueCreate(int size);
 
 int queueSize(Queue q);
 
-bool queueFull(Queue q);
+int queueFull(Queue q);
 
-bool queueEmpty(Queue q);
+int queueEmpty(Queue q);
 
 void enqueue(Queue q, int value, struct timeval arrival);
 

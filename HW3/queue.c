@@ -37,16 +37,16 @@ Queue queueCreate(int size){
 
 // return true if the currect queue is full
 // helper function
-bool queueFull(Queue queue){
+int queueFull(Queue queue){
     if(queue->current_size == queue->max_size)
-        return true;
+        return 1;
     else
-        return false;
+        return 0;
 }
 
 // return true if the currect queue is empty
 // helper function
-bool queueEmpty(Queue queue){
+int queueEmpty(Queue queue){
     return queue->current_size == 0;
 }
 
