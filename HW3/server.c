@@ -267,7 +267,7 @@ void *vipThread(int *thread_number)
         }
         handeling_vip = 1;
         // if I'm here, means there is vip request and I can handle it.
-        struct timeval arrival = queueHeadArrivalTime(vip_waiting_requests);
+        arrival = queueHeadArrivalTime(vip_waiting_requests);
         int connfd = dequeue(vip_waiting_requests);
 
         pthread_mutex_unlock(&lock); // ------------------------------^
