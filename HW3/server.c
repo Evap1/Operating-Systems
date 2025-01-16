@@ -58,7 +58,7 @@
             
             //proccess full queue according to policy
             if (totalReqInQueue() >= queue_size) {
-                if ((sizeQueue(vip_waiting_requests) == queue_size) || strcmp(policy,"block") == 0) {   //as it wassssssss
+                if ((queueSize(vip_waiting_requests) == queue_size) || strcmp(policy,"block") == 0) {   //as it wassssssss
                     while (totalReqInQueue() >= queue_size)
                     { // waiting for place in wait queue
                         pthread_cond_wait(&new_req_allowed, &lock);
@@ -300,6 +300,7 @@
         return false;
     }
 
+    // Usage: <port> <threads_num> <queue_size> <policy>
     void getargs(int *port, int *threads_num, int *queue_size, char* policy, int argc, char *argv[])
     {
         if (argc < 5)
