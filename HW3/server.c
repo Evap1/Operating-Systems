@@ -38,6 +38,7 @@
         int listenfd, connfd, port, clientlen, threads_num;
         char policy[BUFFER];
         struct sockaddr_in clientaddr;
+        struct timeval arrival;
 
         getargs(&port, &threads_num, &queue_size, policy, argc, argv);
         pthread_t *worker_threads = malloc(sizeof(pthread_t) * threads_num);
@@ -52,10 +53,9 @@
             clientlen = sizeof(clientaddr);
             connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *)&clientlen);
 
-            struct timeval arrival; // TO BE MODIFIED !!! JUST TO COMPILE FOR ENQUEUE
-
             pthread_mutex_lock(&lock); // -------------------------------->
             
+            gettimeofday(&arrival, NULL);
             //proccess full queue according to policy
             if (totalReqInQueue() >= queue_size) {
                 // if the waiting list is empty or block, then block as usual
@@ -73,7 +73,7 @@
                 else if (strcmp(policy,"dh") == 0) {                //drop latest request in queue
                     int fd_to_delete = dequeue(waiting_requests);
                     if (fd_to_delete != -1) {
-                    Close(fd_to_delete); 
+                        Close(fd_to_delete); 
                     }
                 }
                 else if (strcmp(policy,"bf") == 0) {                //NOT A BUSY WAIT
