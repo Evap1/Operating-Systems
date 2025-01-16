@@ -18,8 +18,8 @@
 
     // DECLERATIONS
     void initMaster(int threads_num, int queue_size, pthread_t *worker_threads, pthread_t* vip_thread);
-    void *workerThread(int *thread_number);
-    void *vipThread(int *thread_number);
+    void *workerThread(void *thread_number);
+    void *vipThread(void *thread_number);
     void getargs(int *port, int *threads_num, int *queue_size, char* policy, int argc, char *argv[]);
     int totalReqInQueue();
     bool isValidPolicy(char* policy);
@@ -148,20 +148,24 @@
         int i;
         for (i = 0; i < threads_num; i++)
         {
-            pthread_create(&worker_threads[i], NULL, workerThread, &i);
+            int *thread_num = (int*)malloc(sizeof(int));
+            *thread_num = i;
+            pthread_create(&worker_threads[i], NULL, workerThread, thread_num);
         }
-        pthread_create(vip_thread, NULL, vipThread, &i);
+        int *vip_thread_num = (int*)malloc(sizeof(int));
+        *vip_thread_num = i; // Last value of `i`
+        pthread_create(vip_thread, NULL, vipThread, vip_thread_num);
         pthread_mutex_unlock(&lock); // ------------------------------^
     }
 
-    void *workerThread(int *thread_number)
+    void *workerThread(void *thread_number)
     {
         // TODO: make sure these variables are local and not shared through threads
         struct timeval arrival, started, dispatch; // tis was modified
         threads_stats t_stats = (threads_stats)malloc(sizeof(struct Threads_stats));
 
         // Thread ID
-        t_stats->id = *thread_number;
+        t_stats->id = *(int *)thread_number;
         // Number of static requests
         t_stats->stat_req = 0;
         // Number of dynamic requests
@@ -187,7 +191,7 @@
             gettimeofday(&started, NULL);                                  //make sure its the difference between
             timersub(&started, &arrival, &dispatch);                       // dispatch = started - arrival
 
-           int skip_invoked = requestHandle(connfd, arrival, dispatch, t_stats); // perfrom request outside of lock
+            int skip_invoked = requestHandle(connfd, arrival, dispatch, t_stats); // perfrom request outside of lock
             Close(connfd);
 
             pthread_mutex_lock(&lock); // -------------------------------->
@@ -228,14 +232,14 @@
         }
     }
 
-    void *vipThread(int *thread_number)
+    void *vipThread(void *thread_number)
     {
         // TODO: make sure these variables are local and not shared through threads
         struct timeval arrival, started, dispatch; // tis was modified
         threads_stats t_stats = (threads_stats)malloc(sizeof(struct Threads_stats));
 
         // Thread ID
-        t_stats->id = *thread_number;
+        t_stats->id = *(int *)thread_number;
         // Number of static requests
         t_stats->stat_req = 0;
         // Number of dynamic requests
