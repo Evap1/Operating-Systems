@@ -67,12 +67,20 @@
                         pthread_cond_wait(&new_req_allowed, &lock);
                     }
                 }
-                else if (strcmp(policy,"dt") == 0) {                //drop the request and leaveeeee
-                    Close(connfd);
-                    pthread_mutex_unlock(&lock);
-                    continue;
+                else if (strcmp(policy,"dt") == 0) {                //drop tail - brand new request recieved
+                    if(!getRequestMetaData(connfd)){                // req is regular - current is considered tail
+                        Close(connfd);                              // after empty drop worker hoe req
+                        pthread_mutex_unlock(&lock);
+                        continue;
+                    }
+                    else {                                          // req is vip - remove from regular
+                        int fd_to_delete = dequeueTail(waiting_requests);
+                        if (fd_to_delete != -1) {
+                            Close(fd_to_delete);
+                        }
+                    }
                 }
-                else if (strcmp(policy,"dh") == 0) {                //drop latest request in queue
+                else if (strcmp(policy,"dh") == 0) {                //drop head - brand old request recieved
                     int fd_to_delete = dequeue(waiting_requests);
                     if (fd_to_delete != -1) {
                         Close(fd_to_delete); 

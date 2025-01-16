@@ -84,6 +84,31 @@ int dequeue(Queue q){
     return descriptor;
 }
 
+
+// pop tail request and return it's descriptor, if empty, returns -1.
+// used for policy dt
+int dequeueTail(Queue q){
+    if(queueEmpty(q))
+        return -1;
+    Request tail = q->tail;
+    Request new_tail = q->head;
+    int descriptor = q->tail->descriptor;
+
+    if(new_tail == NULL){
+        q->head = NULL;
+        q->tail = NULL;
+    } else {
+        while(new_tail->next != tail) {
+            new_tail = new_tail->next;
+        }
+        new_tail->next = NULL;
+    }
+
+    free(q->tail);
+    q->current_size--;
+    return descriptor;
+}
+
 // for policy - random
 void randomDequeue(Queue q) {
     if(q == NULL || q->current_size == 0) {

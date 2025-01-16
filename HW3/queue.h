@@ -23,6 +23,8 @@ struct timeval queueHeadArrivalTime(Queue q);
 
 int dequeue(Queue q);
 
+int dequeueTail(Queue q);
+
 void randomDequeue(Queue q);
 
 int skipDequeue(Queue q);
