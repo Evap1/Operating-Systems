@@ -85,6 +85,32 @@ int dequeue(Queue q){
     return descriptor;
 }
 
+// for policy - random
+void randomDequeue(Queue q) {
+    if(q == NULL || q->current_size == 0) {
+        return;
+    }
+    int num_req_to_be_deleted = q->current_size / 2;
+    int deleted = 0;
+    Request r = q->head;
+
+    while(deleted < num_req_to_be_deleted) {
+        if(r == q->tail->next) {                //if at the end of the list but still in loop, return to head of the queue
+            r = q->head;                        //meaning we haven't killed enough in the list
+        }
+
+        int rand_index = read() % 2;            //deciding if we want to kill - 1 for kill, 0 for spare
+        if(rand_index) {                        //1 - kill
+            int fd_to_be_deleted = q->head->descriptor;
+            Close(fd_to_be_deleted);
+            dequeueByReq(q, fd_to_be_deleted);
+            deleted++;
+        }
+        r = r->next;
+    }
+
+}
+
 // pop the latest request == the last in queue
 // if empty, return -1.
 int skipDequeue(Queue q){

@@ -56,6 +56,8 @@
             pthread_mutex_lock(&lock); // -------------------------------->
             
             gettimeofday(&arrival, NULL);
+            
+            if (DEBUG)  { printf("[main] : recieved a task at: %ld", arrival.tv_sec); }
             //proccess full queue according to policy
             if (totalReqInQueue() >= queue_size) {
                 // if the waiting list is empty or block, then block as usual
@@ -88,17 +90,7 @@
                     }
                 }
                 else if (strcmp(policy,"random") == 0) {            //drop 50% of the waiting requests by random
-
-                    int num_of_waiting_req = queueSize(waiting_requests);
-                    int i = num_of_waiting_req;
-
-                    while (num_of_waiting_req <= i / 2) {
-                        int j = rand() % (num_of_waiting_req);  //generate a number between 0 and the total wait queue size
-
-                        int fd_to_delete = dequeueByIndex(waiting_requests, j);
-                        Close(fd_to_delete);
-                        num_of_waiting_req--;
-                    }
+                    randomDequeue(waiting_requests);
                 }
             }
 
@@ -186,6 +178,8 @@
         while (1)
         {
             pthread_mutex_lock(&lock); // -------------------------------->
+            if (DEBUG)  { printf("[worker %d] : recieved a task at: %ld", t_stats->id ,arrival.tv_sec); }
+
             while (queueEmpty(waiting_requests) || !queueEmpty(vip_waiting_requests) || handeling_vip)
             { // if empty or vip req, wait
                 pthread_cond_wait(&worker_allowed, &lock);
@@ -226,6 +220,7 @@
             }
 
             pthread_mutex_lock(&lock); // --------------------------------> 
+            if (DEBUG)  { printf("[worker] : finished a task"); }
             dequeueByReq(handeling_requests, connfd);
             if (skip_invoked){
                 dequeueByReq(handeling_requests, skip_connfd);
@@ -261,6 +256,7 @@
         while (1)
         {
             pthread_mutex_lock(&lock); // -------------------------------->
+            if (DEBUG)  { printf("[vip] : recieved a task at: %ld" ,arrival.tv_sec); }
 
             while (queueEmpty(vip_waiting_requests))
             { // if no vip req, wait
@@ -281,6 +277,7 @@
 
             pthread_mutex_lock(&lock); // -------------------------------->
             handeling_vip = 0;
+            if (DEBUG)  { printf("[vip] : finished a task"); }
             if (queueEmpty(vip_waiting_requests) && !queueEmpty(waiting_requests) && !handeling_vip)
             { // if no more vip - pull worker req
                 pthread_cond_broadcast(&worker_allowed);
@@ -293,6 +290,7 @@
             { // for block_flush
                 pthread_cond_signal(&empty_queue);
             }
+            
             pthread_mutex_unlock(&lock); // ------------------------------^
         }
     }
