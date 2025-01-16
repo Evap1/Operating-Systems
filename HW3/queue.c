@@ -1,6 +1,5 @@
-#include <stdio.h>
 #include "queue.h"
-#include <stdlib.h>
+#include "segel.h"
 
 struct Request {
     int descriptor;
@@ -99,7 +98,7 @@ void randomDequeue(Queue q) {
             r = q->head;                        //meaning we haven't killed enough in the list
         }
 
-        int rand_index = read() % 2;            //deciding if we want to kill - 1 for kill, 0 for spare
+        int rand_index = rand() % 2;            //deciding if we want to kill - 1 for kill, 0 for spare
         if(rand_index) {                        //1 - kill
             int fd_to_be_deleted = q->head->descriptor;
             Close(fd_to_be_deleted);
