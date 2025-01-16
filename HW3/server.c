@@ -18,8 +18,8 @@
 
     // DECLERATIONS
     void initMaster(int threads_num, int queue_size, pthread_t *worker_threads, pthread_t* vip_thread);
-    void *workerThread();
-    void *vipThread();
+    void *workerThread(int *thread_number);
+    void *vipThread(int *thread_number);
     void getargs(int *port, int *threads_num, int *queue_size, char* policy, int argc, char *argv[]);
     int totalReqInQueue();
     bool isValidPolicy(char* policy);
@@ -58,6 +58,7 @@
             
             //proccess full queue according to policy
             if (totalReqInQueue() >= queue_size) {
+                // if the waiting list is empty or block, then block as usual
                 if ((queueSize(vip_waiting_requests) == queue_size) || strcmp(policy,"block") == 0) {   //as it wassssssss
                     while (totalReqInQueue() >= queue_size)
                     { // waiting for place in wait queue
@@ -143,16 +144,30 @@
         pthread_cond_init(&full_queue, NULL);
         handeling_vip = 0;
         pthread_mutex_lock(&lock); // -------------------------------->
-        for (int i = 0; i < threads_num; i++)
+
+        int i;
+        for (i = 0; i < threads_num; i++)
         {
-            pthread_create(&worker_threads[i], NULL, workerThread, NULL);
+            pthread_create(&worker_threads[i], NULL, workerThread, &i);
         }
-        pthread_create(vip_thread, NULL, vipThread, NULL);
+        pthread_create(vip_thread, NULL, vipThread, &i);
         pthread_mutex_unlock(&lock); // ------------------------------^
     }
 
-    void *workerThread()
+    void *workerThread(int *thread_number)
     {
+        // TODO: make sure these variables are local and not shared through threads
+        struct timeval arrival, started, dispatch; // tis was modified
+        threads_stats t_stats = (threads_stats)malloc(sizeof(struct Threads_stats));
+
+        // Thread ID
+        t_stats->id = *thread_number;
+        // Number of static requests
+        t_stats->stat_req = 0;
+        // Number of dynamic requests
+        t_stats->dynm_req = 0;
+        // Total number of requests
+        t_stats->total_req = 0;
 
         while (1)
         {
@@ -163,33 +178,14 @@
             }
             // if I'm here, means there is worker request and I can handle it.
             // pop from waiting, insert to handeling:
-            struct timeval arrival = queueHeadArrivalTime(waiting_requests);
+            arrival = queueHeadArrivalTime(waiting_requests);
             int connfd = dequeue(waiting_requests);
             enqueue(handeling_requests, connfd, arrival);
 
             pthread_mutex_unlock(&lock); // ------------------------------^
 
-            // TODO: make sure these variables are local and not shared through threads
-            struct timeval dispatch; // TO BE MODIFIEF !!! JUST TO COMPILE FOR ENQUEUE
-            threads_stats t_stats = (threads_stats)malloc(sizeof(struct Threads_stats));
-
-            // pupper init just for fixing the bug
-            // student code should init it properly by the thread
-            // should read about timeval and see the def of the t_stats struct
-            // Thread ID
-            t_stats->id = 0;
-            // Number of static requests
-            t_stats->stat_req = 0;
-            // Number of dynamic requests
-            t_stats->dynm_req = 0;
-            // Total number of requests
-            t_stats->total_req = 0;
-
-            arrival.tv_sec = 0;
-            arrival.tv_usec = 0;
-            dispatch.tv_sec = 0;
-            dispatch.tv_usec = 0;
-            // TO BE DELETED
+            gettimeofday(&started, NULL);                                  //make sure its the difference between
+            timersub(&started, &arrival, &dispatch);                       // dispatch = started - arrival
 
            int skip_invoked = requestHandle(connfd, arrival, dispatch, t_stats); // perfrom request outside of lock
             Close(connfd);
@@ -232,8 +228,20 @@
         }
     }
 
-    void *vipThread()
+    void *vipThread(int *thread_number)
     {
+        // TODO: make sure these variables are local and not shared through threads
+        struct timeval arrival, started, dispatch; // tis was modified
+        threads_stats t_stats = (threads_stats)malloc(sizeof(struct Threads_stats));
+
+        // Thread ID
+        t_stats->id = *thread_number;
+        // Number of static requests
+        t_stats->stat_req = 0;
+        // Number of dynamic requests
+        t_stats->dynm_req = 0;
+        // Total number of requests
+        t_stats->total_req = 0;
 
         while (1)
         {
@@ -245,31 +253,14 @@
             }
             handeling_vip = 1;
             // if I'm here, means there is vip request and I can handle it.
-            struct timeval arrival = queueHeadArrivalTime(vip_waiting_requests);
+            arrival = queueHeadArrivalTime(vip_waiting_requests);
             int connfd = dequeue(vip_waiting_requests);
 
             pthread_mutex_unlock(&lock); // ------------------------------^
 
-            struct timeval dispatch; // TO BE MODIFIED !!! JUST TO COMPILE FOR ENQUEUE
-            threads_stats t_stats = (threads_stats)malloc(sizeof(struct Threads_stats));
-
-            // pupper init just for fixing the bug
-            // student code should init it properly by the thread
-            // should read about timeval and see the def of the t_stats struct
-            // Thread ID
-            t_stats->id = 0;
-            // Number of static requests
-            t_stats->stat_req = 0;
-            // Number of dynamic requests
-            t_stats->dynm_req = 0;
-            // Total number of requests
-            t_stats->total_req = 0;
-
-            arrival.tv_sec = 0;
-            arrival.tv_usec = 0;
-            dispatch.tv_sec = 0;
-            dispatch.tv_usec = 0;
-            // TO BE DELETED
+            gettimeofday(&started, NULL);                                  //make sure its the difference between
+            timersub(&started, &arrival, &dispatch);                       // dispatch = started - arrival
+            
             requestHandle(connfd, arrival, dispatch, t_stats); // perfrom request outside of lock
             Close(connfd);
 

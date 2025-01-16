@@ -224,6 +224,7 @@ int requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threa
 	Rio_readlineb(&rio, buf, MAXLINE);
 	sscanf(buf, "%s %s %s", method, uri, version);
 	printf("%s %s %s\n", method, uri, version);
+	(t_stats->total_req)++;
 
     // Check for .skip
     int skipInvoked = 0;
