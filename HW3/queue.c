@@ -111,7 +111,7 @@ int dequeueTail(Queue q){
 
 // for policy - random
 void randomDequeue(Queue q) {
-    if(q == NULL || q->current_size == 0) {
+    if(queueEmpty(q)) {
         return;
     }
     int num_req_to_be_deleted = q->current_size / 2;

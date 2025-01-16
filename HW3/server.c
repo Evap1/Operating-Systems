@@ -61,7 +61,7 @@
             //proccess full queue according to policy
             if (totalReqInQueue() >= queue_size) {
                 // if the waiting list is empty or block, then block as usual
-                if ((queueSize(waiting_requests) == 0) || strcmp(policy,"block") == 0) {   //as it wassssssss
+                if (strcmp(policy,"block") == 0) {   //as it wassssssss
                     while (totalReqInQueue() >= queue_size)
                     { // waiting for place in wait queue
                         pthread_cond_wait(&new_req_allowed, &lock);
@@ -73,25 +73,37 @@
                         pthread_mutex_unlock(&lock);
                         continue;
                     }
-                    else {                                          // req is vip - remove from regular
-                        int fd_to_delete = dequeueTail(waiting_requests);
+                    else {                                          //req is vip - remove from regular
+                        int fd_to_delete = dequeueTail(waiting_requests);   //try to dequeue from waiting
                         if (fd_to_delete != -1) {
                             Close(fd_to_delete);
+                        }
+                        else {                                      //waiting is empty - block untill we have enough space in vip queue
+                            while (totalReqInQueue() >= queue_size)
+                            { // waiting for place in wait queue
+                                pthread_cond_wait(&new_req_allowed, &lock);
+                            }
                         }
                     }
                 }
                 else if (strcmp(policy,"dh") == 0) {                //drop head - brand old request recieved
                     int fd_to_delete = dequeue(waiting_requests);
-                    if (fd_to_delete != -1) {
+                    if (fd_to_delete != -1) {                   // check if queue is not empty
                         Close(fd_to_delete); 
+                    }
+                    else {                                      //waiting is empty - block untill we have enough space in vip queue
+                        while (totalReqInQueue() >= queue_size)
+                        { // waiting for place in wait queue
+                            pthread_cond_wait(&new_req_allowed, &lock);
+                        }
                     }
                 }
                 else if (strcmp(policy,"bf") == 0) {                //NOT A BUSY WAIT
-                    while (totalReqInQueue() != 0)                  //use a brand new spanking conditional variable to wait till queue is empty
+                    while (totalReqInQueue() != 0)                  //use a brand new spanking conditional variable to wait till all queues are empty
                     { // waiting for place in wait queue
                         pthread_cond_wait(&empty_queue, &lock);
                     }
-                    if(!getRequestMetaData(connfd)){                // if req A is vip it shouldnt be droped.
+                    if(!getRequestMetaData(connfd)){                // if req A is vip it shouldnt be dropped.
                         Close(connfd);                              // after empty drop worker hoe req
                         pthread_mutex_unlock(&lock);
                         continue;
