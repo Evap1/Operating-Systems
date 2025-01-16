@@ -61,7 +61,7 @@
             //proccess full queue according to policy
             if (totalReqInQueue() >= queue_size) {
                 // if the waiting list is empty or block, then block as usual
-                if ((queueSize(vip_waiting_requests) == queue_size) || strcmp(policy,"block") == 0) {   //as it wassssssss
+                if ((queueSize(waiting_requests) == 0) || strcmp(policy,"block") == 0) {   //as it wassssssss
                     while (totalReqInQueue() >= queue_size)
                     { // waiting for place in wait queue
                         pthread_cond_wait(&new_req_allowed, &lock);
