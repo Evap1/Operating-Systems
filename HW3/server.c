@@ -149,10 +149,19 @@
         for (i = 0; i < threads_num; i++)
         {
             int *thread_num = (int*)malloc(sizeof(int));
+            if (thread_num == NULL) {
+                perror("malloc failed");
+                exit(EXIT_FAILURE);
+            }
             *thread_num = i;
             pthread_create(&worker_threads[i], NULL, workerThread, thread_num);
+
         }
         int *vip_thread_num = (int*)malloc(sizeof(int));
+        if (vip_thread_num == NULL) {
+            perror("malloc failed");
+            exit(EXIT_FAILURE);
+        }
         *vip_thread_num = i; // Last value of `i`
         pthread_create(vip_thread, NULL, vipThread, vip_thread_num);
         pthread_mutex_unlock(&lock); // ------------------------------^
@@ -166,6 +175,7 @@
 
         // Thread ID
         t_stats->id = *(int *)thread_number;
+        free(thread_number);
         // Number of static requests
         t_stats->stat_req = 0;
         // Number of dynamic requests
@@ -240,6 +250,7 @@
 
         // Thread ID
         t_stats->id = *(int *)thread_number;
+        free(thread_number);
         // Number of static requests
         t_stats->stat_req = 0;
         // Number of dynamic requests
