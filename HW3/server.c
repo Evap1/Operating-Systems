@@ -35,7 +35,7 @@
     
     int main(int argc, char *argv[])
     {
-        int listenfd, connfd, port, clientlen, threads_num;
+        int listenfd, connfd, port, clientlen, threads_num, is_vip;
         char policy[BUFFER];
         struct sockaddr_in clientaddr;
         struct timeval arrival;
@@ -56,8 +56,9 @@
             pthread_mutex_lock(&lock); // -------------------------------->
             
             gettimeofday(&arrival, NULL);
-            
+            is_vip = getRequestMetaData(connfd);            //check if regular or vip
             if (DEBUG)  { printf("[main] : recieved a task at: %ld", arrival.tv_sec); }
+
             //proccess full queue according to policy
             if (totalReqInQueue() >= queue_size) {
                 // if the waiting list is empty or block, then block as usual
@@ -68,7 +69,7 @@
                     }
                 }
                 else if (strcmp(policy,"dt") == 0) {                //drop tail - brand new request recieved
-                    if(!getRequestMetaData(connfd)){                // req is regular - current is considered tail
+                    if(!is_vip){                                    // req is regular - current is considered tail
                         Close(connfd);                              // after empty drop worker hoe req
                         pthread_mutex_unlock(&lock);
                         continue;
@@ -103,19 +104,27 @@
                     { // waiting for place in wait queue
                         pthread_cond_wait(&empty_queue, &lock);
                     }
-                    if(!getRequestMetaData(connfd)){                // if req A is vip it shouldnt be dropped.
+                    if(!is_vip){                                    // if req A is vip it shouldnt be dropped.
                         Close(connfd);                              // after empty drop worker hoe req
                         pthread_mutex_unlock(&lock);
                         continue;
                     }
                 }
                 else if (strcmp(policy,"random") == 0) {            //drop 50% of the waiting requests by random
-                    randomDequeue(waiting_requests);
+                    if(!queueEmpty(waiting_requests)) {
+                        randomDequeue(waiting_requests);
+                    }
+                    else {                                          //waiting is empty - block untill we have enough space in vip queue
+                        while (totalReqInQueue() >= queue_size)
+                        { // waiting for place in wait queue
+                            pthread_cond_wait(&new_req_allowed, &lock);
+                        }
+                    }
                 }
             }
 
             // if we are here, there is place for new req:  assign the new req to proper queue
-            if (getRequestMetaData(connfd))
+            if (is_vip)
             {                                                   // vip queue
                 enqueue(vip_waiting_requests, connfd, arrival); // insert new vip req
                 if (queueSize(vip_waiting_requests) == 1)
@@ -235,6 +244,9 @@
             pthread_mutex_unlock(&lock); // ------------------------------^
 
             if(skip_invoked) {      //not supposed to check reccursive skip
+                gettimeofday(&started, NULL);                                  //make sure its the difference between
+                timersub(&started, &arrival, &dispatch);                       // dispatch = started - arrival
+
                 requestHandle(skip_connfd, arrival, dispatch, t_stats);
                 Close(skip_connfd);
             }
