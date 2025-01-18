@@ -1,0 +1,26 @@
+=== Testing Queue Implementation ===
+Queue is empty
+
+--- Enqueuing Requests ---
+Queue (size: 1/3): [Descriptor: 100 | Arrival: 1736419888.744811] -> NULL
+Queue (size: 2/3): [Descriptor: 100 | Arrival: 1736419888.744811] -> [Descriptor: 200 | Arrival: 1736419888.744819] -> NULL
+Queue (size: 3/3): [Descriptor: 100 | Arrival: 1736419888.744811] -> [Descriptor: 200 | Arrival: 1736419888.744819] -> [Descriptor: 300 | Arrival: 1736419888.744824] -> NULL
+Queue full? Yes
+Queue (size: 3/3): [Descriptor: 100 | Arrival: 1736419888.744811] -> [Descriptor: 200 | Arrival: 1736419888.744819] -> [Descriptor: 300 | Arrival: 1736419888.744824] -> NULL
+
+--- Finding Requests ---
+Finding request with descriptor 200: Index 1
+Finding request with descriptor 999 (nonexistent): Index -1
+
+--- Dequeue Requests ---
+Dequeued request descriptor: 100
+Queue (size: 2/3): [Descriptor: 200 | Arrival: 1736419888.744819] -> [Descriptor: 300 | Arrival: 1736419888.744824] -> NULL
+
+--- Dequeue by Index ---
+Dequeued request at index 1: 300
+Queue (size: 1/3): [Descriptor: 200 | Arrival: 1736419888.744819] -> NULL
+
+Queue is empty
+Queue empty? Yes
+
+Destroying queue...
