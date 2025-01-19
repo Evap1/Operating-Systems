@@ -223,7 +223,7 @@ int requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threa
 	Rio_readinitb(&rio, fd);
 	Rio_readlineb(&rio, buf, MAXLINE);
 	sscanf(buf, "%s %s %s", method, uri, version);
-	printf("%s %s %s\n", method, uri, version);
+
 	(t_stats->total_req)++;
 
     // Check for .skip
@@ -245,7 +245,8 @@ int requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threa
 		requestError(fd, filename, "404", "Not found", "OS-HW3 Server could not find this file", arrival, dispatch, t_stats);
 		return skip_invoked;
 	}
-
+	
+	printf("%s %s %s\n", method, uri, version);
 	if (is_static) {
 		if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
 			requestError(fd, filename, "403", "Forbidden", "OS-HW3 Server could not read this file", arrival, dispatch, t_stats);

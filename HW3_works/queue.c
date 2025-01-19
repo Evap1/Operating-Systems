@@ -114,7 +114,7 @@ void randomDequeue(Queue q) {
     if(queueEmpty(q)) {
         return;
     }
-    int num_req_to_be_deleted = q->current_size / 2;
+    int num_req_to_be_deleted = (q->current_size + 1)/ 2;
     int deleted = 0;
     Request r = q->head;
 
