@@ -86,7 +86,7 @@ int dequeue(Queue q){
 
 
 // pop tail request and return it's descriptor, if empty, returns -1.
-// used for policy dt
+// used for policy dt, drop the latest request in the regular waiting queue 
 int dequeueTail(Queue q){
     if(queueEmpty(q))
         return -1;
@@ -118,7 +118,7 @@ void randomDequeue(Queue q) {
     int deleted = 0;
     Request r = q->head;
 
-    while(deleted < num_req_to_be_deleted) {
+    while(deleted <= num_req_to_be_deleted) {
         if(r == q->tail->next) {                //if at the end of the list but still in loop, return to head of the queue
             r = q->head;                        //meaning we haven't killed enough in the list
         }
