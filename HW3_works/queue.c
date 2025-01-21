@@ -87,28 +87,31 @@ int dequeue(Queue q){
 
 // pop tail request and return it's descriptor, if empty, returns -1.
 // used for policy dt, drop the latest request in the regular waiting queue 
+// int dequeueTail(Queue q){
+//     if(queueEmpty(q))
+//         return -1;
+//     Request tail = q->tail;
+//     Request new_tail = q->head;
+//     int descriptor = q->tail->descriptor;
+
+//     if(new_tail == NULL){
+//         q->head = NULL;
+//         q->tail = NULL;
+//     } else {
+//         while(new_tail->next != tail) {
+//             new_tail = new_tail->next;
+//         }
+//         new_tail->next = NULL;
+//     }
+
+//     free(q->tail);
+//     q->current_size--;
+//     return descriptor;
+// }
+
 int dequeueTail(Queue q){
-    if(queueEmpty(q))
-        return -1;
-    Request tail = q->tail;
-    Request new_tail = q->head;
-    int descriptor = q->tail->descriptor;
-
-    if(new_tail == NULL){
-        q->head = NULL;
-        q->tail = NULL;
-    } else {
-        while(new_tail->next != tail) {
-            new_tail = new_tail->next;
-        }
-        new_tail->next = NULL;
-    }
-
-    free(q->tail);
-    q->current_size--;
-    return descriptor;
+    return dequeueByIndex(q, queueSize(q)-1);
 }
-
 // for policy - random
 void randomDequeue(Queue q) {
     if(queueEmpty(q)) {
@@ -142,8 +145,7 @@ int skipDequeue(Queue q){
         return -1;
     }
 
-    int last_index = queueSize(q) - 1;
-    return dequeueByIndex(q , last_index);
+    return dequeueTail(q);
 }
 
 int headDesciprot(Queue q){
@@ -157,6 +159,13 @@ struct timeval queueHeadArrivalTime(Queue q){
     if(queueEmpty(q))
         return (struct timeval){0};
     return q->head->arrival;
+}
+
+// return time of arrival of head request (first added), if empty returns 0
+struct timeval queueTailArrivalTime(Queue q){
+    if(queueEmpty(q))
+        return (struct timeval){0};
+    return q->tail->arrival;
 }
 
 // return the index in queue of request, if not found or empty return -1.
@@ -184,35 +193,65 @@ void dequeueByReq(Queue q, int descriptor){
     dequeueByIndex(q, index);
 }
 
-// pop request in the given index, if empty or invalid index return -1, else return the descriptor of the request
-int dequeueByIndex(Queue q, int index){
-    if(queueEmpty(q))
+int dequeueByIndex(Queue q, int index)
+{
+    // assume element num exists in the queue
+    if (index >= queueSize(q) || index < 0)
+    {
         return -1;
-
-    if(index < 0 || index >= queueSize(q))
-        return -1;
-
-    if(index == 0){
+    }
+    if (index == 0)
+    {
         return dequeue(q);
     }
-
-    Request node_to_dequeue = q->head;
-    Request prev_node = NULL;
-    for(int i = 0; i < index; i++){
-        prev_node = node_to_dequeue;
-        node_to_dequeue = node_to_dequeue->next;
+    Request prev_wanted_request = NULL;
+    Request wanted_request = q->head;
+    for (int i = 0; i < index; i++)
+    {
+        prev_wanted_request = wanted_request;
+        wanted_request = wanted_request->next;
     }
 
-    int value = node_to_dequeue->descriptor;
-    prev_node->next = node_to_dequeue->next;
-    free(node_to_dequeue);
-    if(index == queueSize(q) - 1){
-        q->tail = prev_node;
+    int wanted_descriptor = wanted_request->descriptor;
+    prev_wanted_request->next = wanted_request->next;
+    free(wanted_request);
+    if (index == queueSize(q) - 1)
+    {
+        q->tail = prev_wanted_request;
     }
     q->current_size--;
-
-    return value;
+    return wanted_descriptor;
 }
+
+// // pop request in the given index, if empty or invalid index return -1, else return the descriptor of the request
+// int dequeueByIndex(Queue q, int index){
+//     if(queueEmpty(q))
+//         return -1;
+
+//     if(index < 0 || index >= queueSize(q))
+//         return -1;
+
+//     if(index == 0){
+//         return dequeue(q);
+//     }
+
+//     Request node_to_dequeue = q->head;
+//     Request prev_node = NULL;
+//     for(int i = 0; i < index; i++){
+//         prev_node = node_to_dequeue;
+//         node_to_dequeue = node_to_dequeue->next;
+//     }
+
+//     int value = node_to_dequeue->descriptor;
+//     prev_node->next = node_to_dequeue->next;
+//     free(node_to_dequeue);
+//     if(index == queueSize(q) - 1){
+//         q->tail = prev_node;
+//     }
+//     q->current_size--;
+
+//     return value;
+// }
 
 int queueSize(Queue q){
     return q->current_size;

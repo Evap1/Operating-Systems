@@ -14,7 +14,7 @@
 // Repeatedly handles HTTP requests sent to this port number.
 // Most of the work is done within routines written in request.c
 //
-int DEBUG = 0;
+int DEBUG = 1;
 
 // DECLERATIONS
 void initMaster(int threads_num, int queue_size, pthread_t *worker_threads, pthread_t *vip_thread);
@@ -31,13 +31,16 @@ pthread_cond_t new_req_allowed, vip_allowed, worker_allowed, empty_queue, full_q
 int queue_size;
 int handeling_vip;
 const char *common_policies[] = {"block", "dh", "dt", "bf", "random"};
+struct timeval initt; // STARTED TO BE DELETED
 
 int main(int argc, char *argv[])
 {
     int listenfd, connfd, port, clientlen, threads_num, is_vip;
     char policy[BUFFER];
     struct sockaddr_in clientaddr;
-    struct timeval arrival;
+    struct timeval arrival, started; // STARTED TO BE DELETED
+    gettimeofday(&initt, NULL); // DELTEEEEE
+
 
     getargs(&port, &threads_num, &queue_size, policy, argc, argv);
     pthread_t *worker_threads = malloc(sizeof(pthread_t) * threads_num);
@@ -58,7 +61,7 @@ int main(int argc, char *argv[])
         is_vip = getRequestMetaData(connfd); // check if regular or vip
         if (DEBUG)
         {
-            printf("[main] : recieved a task at: %ld", arrival.tv_sec);
+            printf("[main] : recieved a task at: %ld, number:%d\n", arrival.tv_sec-initt.tv_sec, connfd);
         }
 
         // proccess full queue according to policy
@@ -69,7 +72,17 @@ int main(int argc, char *argv[])
             { // as it wassssssss
                 while (totalReqInQueue() >= queue_size)
                 { // waiting for place in wait queue
+                    if (DEBUG)
+                    {
+                    gettimeofday(&started, NULL);
+                    printf("[master] : cond waiting at:%ld\n", started.tv_sec-initt.tv_sec) ;
+                    }
                     pthread_cond_wait(&new_req_allowed, &lock);
+                    if (DEBUG)
+                    {
+                    gettimeofday(&started, NULL);
+                    printf("[master] : return from cond waiting at:%ld\n", started.tv_sec-initt.tv_sec);
+                    }
                 }
             }
             else if (strcmp(policy, "dt") == 0)
@@ -85,6 +98,11 @@ int main(int argc, char *argv[])
                     int fd_to_delete = dequeueTail(waiting_requests); // try to dequeue from waiting
                     if (fd_to_delete != -1)
                     { // should always succeed since the waiting should not be empty here
+                        if (DEBUG)
+                        {
+                            gettimeofday(&started, NULL);
+                            printf("[master] dt policy! QueueSize=%d, dropped %d at:%ld\n",totalReqInQueue()+1,fd_to_delete ,started.tv_sec-initt.tv_sec);
+                        }
                         Close(fd_to_delete);
                     }
                 }
@@ -101,7 +119,17 @@ int main(int argc, char *argv[])
             {                                  // NOT A BUSY WAIT
                 while (totalReqInQueue() != 0) // use a brand new spanking conditional variable to wait till all queues are empty
                 {                              // waiting untill all the requests in the queues are handled
+                    if (DEBUG)
+                    {
+                    gettimeofday(&started, NULL);
+                    printf("[master] :block flush cond waiting at:%ld\n", started.tv_sec-initt.tv_sec);
+                    }
                     pthread_cond_wait(&empty_queue, &lock);
+                    if (DEBUG)
+                    {
+                    gettimeofday(&started, NULL);
+                    printf("[master] : return from block flush cond waiting at:%ld\n", started.tv_sec-initt.tv_sec);
+                    }
                 }
                 if (!is_vip)
                 {                                // if req A is vip it shouldnt be dropped.
@@ -120,6 +148,11 @@ int main(int argc, char *argv[])
         if (is_vip)
         {                                                   // vip queue
             enqueue(vip_waiting_requests, connfd, arrival); // insert new vip req
+            if (DEBUG)
+            {
+            gettimeofday(&started, NULL);
+            printf("[master] :adding new vip req. Queuesize=%d, TotalSize=%d\n", queueSize(vip_waiting_requests), totalReqInQueue());
+            }
             if (queueSize(vip_waiting_requests) == 1)
             { // if first vip req, signal there is pending vip req
                 pthread_cond_signal(&vip_allowed);
@@ -128,6 +161,11 @@ int main(int argc, char *argv[])
         else
         { // worker queue
             enqueue(waiting_requests, connfd, arrival);
+            if (DEBUG)
+            {
+            gettimeofday(&started, NULL);
+            printf("[master] :adding new worker req. Queuesize=%d,  TotalSize=%d\n", queueSize(waiting_requests), totalReqInQueue());
+            }
             if (queueEmpty(vip_waiting_requests) && !handeling_vip)
             {
                 pthread_cond_signal(&worker_allowed);
@@ -170,6 +208,9 @@ void initMaster(int threads_num, int queue_size, pthread_t *worker_threads, pthr
         }
         *thread_num = i;
         pthread_create(&worker_threads[i], NULL, workerThread, thread_num);
+        if(DEBUG){
+            printf("new worker thread created, number: %d\n", i);
+        }
     }
     int *vip_thread_num = (int *)malloc(sizeof(int));
     if (vip_thread_num == NULL)
@@ -179,6 +220,9 @@ void initMaster(int threads_num, int queue_size, pthread_t *worker_threads, pthr
     }
     *vip_thread_num = i; // Last value of `i`
     pthread_create(vip_thread, NULL, vipThread, vip_thread_num);
+    if(DEBUG){
+            printf("new vip thread created, number: %d\n", i);
+    }
     pthread_mutex_unlock(&lock); // ------------------------------^
 }
 
@@ -201,14 +245,26 @@ void *workerThread(void *thread_number)
     while (1)
     {
         pthread_mutex_lock(&lock); // -------------------------------->
-        if (DEBUG)
-        {
-            printf("[worker %d] : recieved a task at: %ld", t_stats->id, arrival.tv_sec);
-        }
+
 
         while (queueEmpty(waiting_requests) || !queueEmpty(vip_waiting_requests) || handeling_vip)
         { // if empty or vip req, wait
+            if (DEBUG)
+            {
+                gettimeofday(&started, NULL);
+                printf("[worker %d] :cond wait at: %ld\n", t_stats->id, started.tv_sec -initt.tv_sec);
+            }
             pthread_cond_wait(&worker_allowed, &lock);
+            if (DEBUG)
+            {
+                gettimeofday(&started, NULL);
+                printf("[worker %d] : return from cond wait at: %ld\n", t_stats->id, started.tv_sec -initt.tv_sec);
+            }
+        }
+        if (DEBUG)
+        {
+            gettimeofday(&started, NULL);
+            printf("[worker %d] : recieved a task at: %ld\n", t_stats->id, started.tv_sec -initt.tv_sec);
         }
         // if I'm here, means there is worker request and I can handle it.
         // pop from waiting, insert to handeling:
@@ -222,6 +278,13 @@ void *workerThread(void *thread_number)
         timersub(&started, &arrival, &dispatch); // dispatch = started - arrival
 
         int skip_invoked = requestHandle(connfd, arrival, dispatch, t_stats); // perfrom request outside of lock
+        // if (DEBUG)
+        // {
+        //     printf("[worker %d] :return from handle! skip_invoked=%d\n", skip_invoked);
+        //     if(skip_invoked){
+        //         printf("indise if\n");
+        //     }
+        // }   
         Close(connfd);
 
         pthread_mutex_lock(&lock); // -------------------------------->
@@ -237,8 +300,13 @@ void *workerThread(void *thread_number)
 
         int skip_connfd;
         if (skip_invoked)
-        {                                                     // need to handle latest req by the sme thread
-            arrival = queueHeadArrivalTime(waiting_requests); // to be changed
+        {              
+            if (DEBUG)
+            {
+                printf("[worker %d] : skip invoked !Wait QeueuSize=%d, TotalSize=%d\n", t_stats->id, queueSize(waiting_requests), totalReqInQueue());
+            }    
+                                                   // need to handle latest req by the sme thread
+            arrival = queueTailArrivalTime(waiting_requests); // to be changed
             skip_connfd = skipDequeue(waiting_requests);
             if (skip_connfd == -1)
             { // no new fd found
@@ -254,7 +322,11 @@ void *workerThread(void *thread_number)
         pthread_mutex_unlock(&lock); // ------------------------------^
 
         if (skip_invoked)
-        {                                            // not supposed to check reccursive skip
+        {      
+            if (DEBUG)
+            {
+                printf("[worker %d] : skip invoked ! handling !, TotalSize=%d\n", t_stats->id, totalReqInQueue());
+            }                                      // not supposed to check reccursive skip
             gettimeofday(&started, NULL);            // make sure its the difference between
             timersub(&started, &arrival, &dispatch); // dispatch = started - arrival
 
@@ -265,7 +337,7 @@ void *workerThread(void *thread_number)
         pthread_mutex_lock(&lock); // -------------------------------->
         if (DEBUG)
         {
-            printf("[worker] : finished a task");
+            printf("[worker %d] : finished a task, TotalSize=%d\n", t_stats->id,  totalReqInQueue());
         }
         if (skip_invoked)
         {
@@ -303,20 +375,31 @@ void *vipThread(void *thread_number)
     while (1)
     {
         pthread_mutex_lock(&lock); // -------------------------------->
-        if (DEBUG)
-        {
-            printf("[vip] : recieved a task at: %ld", arrival.tv_sec);
-        }
 
         while (queueEmpty(vip_waiting_requests))
         { // if no vip req, wait
+            if (DEBUG)
+            {
+            gettimeofday(&started, NULL);
+            printf("[vip] : cond waiting at:%ld\n", started.tv_sec -initt.tv_sec);
+            }
             pthread_cond_wait(&vip_allowed, &lock);
+            if (DEBUG)
+            {
+            gettimeofday(&started, NULL);
+            printf("[vip] : return from cond waiting at:%ld\n", started.tv_sec -initt.tv_sec);
+            }
         }
+
         handeling_vip = 1;
         // if I'm here, means there is vip request and I can handle it.
         arrival = queueHeadArrivalTime(vip_waiting_requests);
         int connfd = dequeue(vip_waiting_requests);
-
+        if (DEBUG)
+        {
+            gettimeofday(&started, NULL);
+            printf("[vip] : recieved a task from: %ld by time: %ld\n", arrival.tv_sec, started.tv_sec-initt.tv_sec);
+        }
         pthread_mutex_unlock(&lock); // ------------------------------^
 
         gettimeofday(&started, NULL);            // make sure its the difference between
@@ -329,10 +412,15 @@ void *vipThread(void *thread_number)
         handeling_vip = 0;
         if (DEBUG)
         {
-            printf("[vip] : finished a task");
+            printf("[vip] : finished task %d, TotalSize=%d\n", connfd,  totalReqInQueue());
         }
         if (queueEmpty(vip_waiting_requests) && !queueEmpty(waiting_requests) && !handeling_vip)
         { // if no more vip - pull worker req
+            if (DEBUG)
+            {
+                gettimeofday(&started, NULL);
+                printf("[vip] : no more vip, waking all workers at:%ld\n", started.tv_sec -initt.tv_sec);
+            }
             pthread_cond_broadcast(&worker_allowed);
         }
         if (totalReqInQueue() < queue_size)

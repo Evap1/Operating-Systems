@@ -5,6 +5,7 @@
 #include "segel.h"
 #include "request.h"
 
+
 // requestError(      fd,    filename,        "404",    "Not found", "OS-HW3 Server could not find this file");
 void requestError(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
 {
@@ -190,7 +191,7 @@ void requestServeStatic(int fd, char *filename, int filesize, struct timeval arr
 }
 
 //  Returns True/False if realtime event
-int getRequestMetaData(int fd /*, int* est* for future use ignore this*/)
+int getRequestMetaData(int fd )
 {
 	char buf[MAXLINE], method[MAXLINE];
 	int bytesRead  = recv(fd, buf, MAXLINE - 1, MSG_PEEK);
@@ -233,6 +234,16 @@ int requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threa
         *strstr(filename, ".skip") = '\0';
     }
 
+	// Check for .skip in URI
+    char *skip_ptr = strstr(uri, ".skip");
+    if (skip_ptr != NULL) {
+        skip_invoked = 1;
+        // Remove ".skip" from URI
+        memmove(skip_ptr, skip_ptr + SKIP_BYTES, strlen(skip_ptr + SKIP_BYTES) + 1); 
+    }
+	printf("%s %s %s\n", method, uri, version);
+
+
 	if (strcasecmp(method, "GET") && strcasecmp(method, "REAL")) {
 		requestError(fd, method, "501", "Not Implemented", "OS-HW3 Server does not implement this method", arrival, dispatch, t_stats);
 		return skip_invoked;
@@ -246,7 +257,6 @@ int requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threa
 		return skip_invoked;
 	}
 	
-	printf("%s %s %s\n", method, uri, version);
 	if (is_static) {
 		if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
 			requestError(fd, filename, "403", "Forbidden", "OS-HW3 Server could not read this file", arrival, dispatch, t_stats);

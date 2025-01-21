@@ -20,6 +20,9 @@ void enqueue(Queue q, int value, struct timeval arrival);
 
 struct timeval queueHeadArrivalTime(Queue q);
 
+struct timeval queueTailArrivalTime(Queue q);
+
+
 int dequeue(Queue q);
 
 int dequeueTail(Queue q);

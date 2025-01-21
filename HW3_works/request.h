@@ -1,6 +1,7 @@
 #ifndef __REQUEST_H__
 #define __REQUEST_H__
 
+#define SKIP_BYTES 5
 
 typedef struct Threads_stats{
 	int id;

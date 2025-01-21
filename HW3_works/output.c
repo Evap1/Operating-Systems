@@ -10,8 +10,8 @@
 // handling http requests.
 // 
 
-double spinfor = 5.0;
-
+double spinfor = 10.0;
+int id = -1;
 void getargs()
 {
   char *buf, *p;
@@ -21,9 +21,10 @@ void getargs()
     p = strtok(buf, "&");
     if (p == NULL) 
       return;
-    spinfor = atof(p);
+    id = atof(p);
     return;
   }
+
 }
 
 double Time_GetSeconds() {
@@ -48,11 +49,13 @@ int main(int argc, char *argv[])
   sprintf(content, "<p>Welcome to the CGI program</p>\r\n");
   sprintf(content, "%s<p>My only purpose is to waste time on the server!</p>\r\n", content);
   sprintf(content, "%s<p>I spun for %.2f seconds</p>\r\n", content, t2 - t1);
-  
+  sprintf(content, "%s<p>Your ID is: %d</p>\r\n", content, id);
+
   /* Generate the HTTP response */
   printf("Content-length: %lu\r\n", strlen(content));
   printf("Content-type: text/html\r\n\r\n");
   printf("%s", content);
+
   fflush(stdout);
 
   exit(0);
