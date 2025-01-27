@@ -1,5 +1,6 @@
 #include <unistd.h> // for sbrk
 #include <stdio.h>  // for stat print
+#include <string.h> // for memove and memset
 
 #define NO_SIZE 0
 #define TOO_MUCH_SIZE 100000000 // 10^8
