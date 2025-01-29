@@ -1,0 +1,40 @@
+Start testing: Jan 29 10:15 UTC
+----------------------------------------------------------
+27/47 Testing: malloc_3.Challenge 0 - Memory Utilization
+27/47 Test: malloc_3.Challenge 0 - Memory Utilization
+Command: "/home/student/Documents/GitHub/HW4/build/tests/malloc_3_test" "Challenge 0 - Memory Utilization"
+Directory: /home/student/Documents/GitHub/HW4/build/tests
+"malloc_3.Challenge 0 - Memory Utilization" start time: Jan 29 10:15 UTC
+Output:
+----------------------------------------------------------
+Filters: Challenge 0 - Memory Utilization
+Randomness seeded to: 3779264049
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+malloc_3_test is a Catch2 v3.0.1 host application.
+Run with -? for options
+
+-------------------------------------------------------------------------------
+Challenge 0 - Memory Utilization
+-------------------------------------------------------------------------------
+/home/student/Documents/GitHub/HW4/tests/malloc_3_test_basic.cpp:99
+...............................................................................
+
+/home/student/Documents/GitHub/HW4/tests/malloc_3_test_basic.cpp:88: FAILED:
+  REQUIRE( _num_allocated_blocks() == __total_blocks )
+with expansion:
+  32 == 42
+
+===============================================================================
+test cases: 1 | 1 failed
+assertions: 7 | 6 passed | 1 failed
+
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Failed.
+"malloc_3.Challenge 0 - Memory Utilization" end time: Jan 29 10:15 UTC
+"malloc_3.Challenge 0 - Memory Utilization" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Jan 29 10:15 UTC

@@ -5,11 +5,11 @@
 #include <stdint.h>   // for uintptr_t 
 
 #define NO_SIZE 0
-#define TOO_MUCH_SIZE 100000000 // 10^8
-#define MAX_ORDER 10
-#define MAX_SIZE_BLOCK 128*1024 // 128kB = 2^17B
+#define TOO_MUCH_SIZE 100000000         // 10^8
+#define MAX_ORDER 10                    // for array of sbrk
+#define MAX_BLOCK_SIZE 128*1024        // 128kB = 2^17B
 #define INIT_NUM_BLOCKS 32
-#define INIT_BLOCK_UNIT 128
+#define BLOCK_UNIT 128
 #define ALLIGNMEMT_FACTOR 32*128*1024
 
 typedef struct MallocMetaData { //header stuff
@@ -26,23 +26,27 @@ typedef struct MallocMetaData { //header stuff
  * first search
  * splitting - block buddies system
  * allocations should be only upon first malloc request and only then!
+ * size of block in sbrk_blocks - order 0:  2^0 *  128 = 128 ( -metadata)
+ *                                order 1:  2^1 *  128 = 256
+ *                                ..
+ *                                order 10: 2^10 * 128 = 128kb
 ----------------------------------------------------------------------------------------
 */
 class BlockList {
 private:
-    MetaData* smols_list[MAX_ORDER + 1];     // sbrk
-    MetaData* mmap_list;                     // mmap
+    MetaData* sbrk_blocks[MAX_ORDER + 1];
+    MetaData* mmap_blocks;
+    bool      is_first_malloc;
 
-    bool is_first_smalloc;
     size_t num_free_blocks;
     size_t num_free_bytes;
     size_t num_allocated_blocks;
     size_t num_allocated_bytes;
 
 public:
-    BlockList() : mmap_list(NULL), is_first_smalloc(true), num_free_blocks(0), num_free_bytes(0), num_allocated_blocks(0), num_allocated_bytes(0) {
-        for(int i = 0; i < MAX_ORDER; i++) {                            //initialize the lists to NULL
-            smols_list[i] = NULL;
+    BlockList() : mmap_blocks(NULL),is_first_malloc(true), num_free_blocks(0), num_free_bytes(0), num_allocated_blocks(0), num_allocated_bytes(0) {
+        for (int i = 0; i <= MAX_ORDER; i ++) {
+            sbrk_blocks[i] = NULL;
         }
     }
 
@@ -50,16 +54,8 @@ public:
         return (MetaData*)((char*)p - MMD_SIZE);
     }
 
-    MetaData* calcXORForBuddies(void* address, size_t size)
-        {
-            uintptr_t first_reused = reinterpret_cast<uintptr_t>(address);
-            uintptr_t second_reused = reinterpret_cast<uintptr_t>(size);
-            uintptr_t result = first_reused ^ second_reused;                                        // XOR's between the addresses
-            return (MetaData*)(result);
-        }
-
-    size_t calcOrderOfBlock(size_t size) {                      // need to check if i want to find the order while including the metadata
-        size_t size_with_metadata = (MMD_SIZE + size) / INIT_BLOCK_UNIT;
+    int blockOrder(size_t size) {
+        size_t size_with_metadata = (MMD_SIZE + size) / BLOCK_UNIT;         // without the 128 unit
         int order = 0;
         while(size_with_metadata > 1)
         {
@@ -69,285 +65,263 @@ public:
         return order;
     }
 
-    size_t calcBlockSize(size_t index) {
-        return 1 << index;
-    }
-
+    /* sbrk implementation */
+    
     // the heap grows towards the higher addrsses so adding from the last member should suffice in keeping it sorted
-    void addSbrkBlock(MetaData* block) {       // add allocated block to list
-        size_t index = calcOrderOfBlock(block->size);
-            
-        if(smols_list[index] == NULL)                                     // if list empty set it to be the block
-            smols_list[index] = block;
-        else {                                                            // need to keep the list sorted lets go
-            MetaData* current = smols_list[index], *prev = NULL;
-            while(current != NULL) {
-                if (block < current) {
-                    prev = current;
-                    break;
-                }
-                prev = current;
-                current = current->next;
-            }
-            if(current == NULL) {                                   // end of list
-                prev->next = block;
-                block->prev = prev;
-            }
-            else if (prev->prev == NULL){                           // start of list
-                prev->prev = block;
-                block->next = prev;
-                smols_list[index] = block;
-            }
-            else {                                                  // middle of list
-                block->next = prev;
-                block->prev = prev->prev;
-                (block->prev)->next = block;
-                prev->prev = block;
-            }
-        }
-    }
-
-    void splitBlock(MetaData* block)
-    {
-        size_t new_block_total_size = (block->size + MMD_SIZE) / 2;
-        size_t new_mem_size = new_block_total_size - MMD_SIZE;
-        
-        MetaData* new_buddy_block = (MetaData*)((char*)block + new_block_total_size); // new free block
-        new_buddy_block->size = new_mem_size;
-        new_buddy_block->is_free = true;
-        new_buddy_block->next = NULL;
-        new_buddy_block->prev = NULL;
-
-        block->size = new_mem_size;
-        addSbrkBlock(new_buddy_block); // insert the free block back
-    }
-
-    MetaData* findBestBlockForSbrkAlloc(size_t size) {
-        int order=0;
-        size_t num=128;
-        while(size + MMD_SIZE > num)                                    //just like calc order but we need the num too to calculate with MMD (maybe can merge)
-        {
-            num = num * 2;
-            order++;
-        }
-        for(int i = order; i <= MAX_ORDER; i++) {
-            MetaData* current = smols_list[i];
-            while(current != NULL) {
-                if(current->size >= size && current->is_free)
-                    return current;
-                current = current->next;
-            }
-        }
-        return NULL;                                        // is this even possible lets find out
-    }
-
-    void addMmapBlock(MetaData* block) {                     // add allocated block to list
-        if(mmap_list == NULL) {                                // if list empty set it to be the block
-            mmap_list = block;
+    void addBlock_Sbrk(MetaData* block) {                         // add allocated block to list
+        int block_order = blockOrder(block->size);
+        // no block in list
+        if (sbrk_blocks[block_order] == NULL) {
+            sbrk_blocks[block_order] = block;
             return;
         }
-        mmap_list->prev = block;                             // we don't need to make sure the mmap list is sorted
-        block->next = mmap_list;                         
+
+        // we try to find space in the list
+        MetaData* current = sbrk_blocks[block_order], *prev = NULL;
+        while (current != NULL && current < block) {
+            prev = current;
+            current = current->next;
+        }
+
+        if (prev == NULL) {                                       // first in list
+            sbrk_blocks[block_order]->prev = block;
+            block->next = sbrk_blocks[block_order];
+            sbrk_blocks[block_order] = block;
+        }
+        else if (current == NULL) {                               // last in list
+            prev->next = block;
+            block->prev = prev;
+        }
+        else {                                                    // oh no we in the middle
+            prev->next = block;                                   // prev->next | prev<-block->next | prev<-current
+            current->prev = block;
+            block->prev = prev;
+            block->next = current;
+        }
     }
 
-    void removeSbrkBlockFromList(MetaData* block) {          // for split
-        size_t index = calcOrderOfBlock(block->size);
-        if(block->prev==NULL) {                              //if we want to delete head
-            smols_list[index] = block->next;
-            block->next=NULL;
-            return;
-        }
-        else if(block->next==NULL) {                         //if we want to remove at last
-
-            (block->prev)->next = NULL;
-            block->prev = NULL;
-            return;
-        }
-        else {                                               //regular delete
-            (block->prev)->next = block->next;
-            (block->next)->prev = block->prev;
-            block->next = NULL;
-            block->prev = NULL;
-        }
-    }
-
-    void freeMmapBlock(void* block) {                      // for split / mmap
-        MetaData* p = getMetaData(block);
-        if(p->prev == NULL) {                              //if we want to delete head
-            mmap_list = p->next;
-            p->next = NULL;
-            return;
-        }
-        else if(p->next==NULL) {                         //if we want to remove at last
-
-            (p->prev)->next = NULL;
-            p->prev = NULL;
-            return;
-        }
-        else {                                               //regular delete
-            (p->prev)->next = p->next;
-            (p->next)->prev = p->prev;
-            p->next=NULL;
-            p->prev=NULL;
-        }
-
-        //stats
-        num_allocated_blocks -= 1;
-        num_allocated_bytes -= p->size;
-        munmap(p, p->size + MMD_SIZE);
-    }
-
-    void setFreeFinalFinalLastFree(MetaData* p) {
-        p->is_free=true;
-
-        //add to statistics
-        this->num_free_blocks += 1;
-        this->num_free_bytes += p->size;
-    }
-
-    void tryToMerge(MetaData* p) {
-        size_t mem_size = MAX_SIZE_BLOCK - MMD_SIZE;
-        if(p->size >= mem_size)                             // the size is bigger than max size - leave it be (too big to merge a ba bye)
-        {
-            setFreeFinalFinalLastFree(p);
-            return;
-        }
-        // we can try and merge hell yeah lets go
-        MetaData* buddy = calcXORForBuddies(p, p->size + MMD_SIZE);
-        if(buddy->is_free == false)                             // aw we can't merge :(
-        {
-            setFreeFinalFinalLastFree(p);
-            return;
-        }
-        MetaData* first, *second; 
-        while(buddy->is_free == true)
-        {   // else - we can try and merge more yeee
-            removeSbrkBlockFromList(buddy);
-
-            if(p < buddy) {                                                      // decide who is first in terms of address
-                first = p;
-                second = buddy;
-            }
-            else {
-                first = buddy;
-                second = p;
-            }
-            first->size = first->size + MMD_SIZE + second->size;                 // the metadata is no longer here with us so add him back
-            if(first->size >= mem_size)                                          // can't merge this big ass hoe
-                break;
-            p = first;
-
-            //stats
-            this->num_free_blocks -= 1;
-
-            buddy = calcXORForBuddies(p, MMD_SIZE + p->size);                   // on to the next victim i mean block
-        }
-        addSbrkBlock(first);
-        setFreeFinalFinalLastFree(p);  
-    }
-
-    void freeSbrkBlock(void* block) {                           // free allocated block
-        MetaData* p = getMetaData(block);
-        if (p->is_free == true)                                 // if already free i don't care
-            return;
-        tryToMerge(p);
-        return;
-    }
-
-    void firstSbrkAllocs() {
+    bool allignmentForHeap() {
         // allignment inside heap so we'll have pretty alignment
-        void* current_p_break = sbrk(0);
-        intptr_t prog_break_address = (intptr_t)current_p_break;
-        intptr_t aligned_prog_break_address = (prog_break_address + ALLIGNMEMT_FACTOR - 1) & ~(ALLIGNMEMT_FACTOR - 1);
-        if(sbrk(aligned_prog_break_address - prog_break_address) == (void*)-1)
-            return;
+        void* pointer_break = sbrk(0);
+        intptr_t address = (intptr_t)pointer_break;
+        intptr_t alligned_address = (address + ALLIGNMEMT_FACTOR - 1) & ~(ALLIGNMEMT_FACTOR - 1);
+        if(sbrk(alligned_address - address) == (void*)-1)
+            return false;
+        return true;
+    }
 
-        // heaping shit ahead of time (32 units)
-        MetaData* current = NULL;                                // initialize the 32 blocks
-        for(int i = 0; i < INIT_NUM_BLOCKS; i++) {
-            void* prog_break = sbrk(MAX_SIZE_BLOCK);                   // did not find free block - time to make a new one
-            if(prog_break == (void*)-1)
+    void firstAlloc_Sbrk() {
+        is_first_malloc = false;
+        if(!allignmentForHeap())                                  // could not allocate memory
+            return;
+        
+        size_t allocation_cost = MAX_BLOCK_SIZE;
+        size_t size_of_data = allocation_cost - MMD_SIZE;
+        for (int i = 0; i < INIT_NUM_BLOCKS; i++) {
+            void* p_break = sbrk(allocation_cost);
+            if(p_break == (void*)-1)
                 return;
-            
-            MetaData* new_block = (MetaData*)prog_break;
-            new_block->size = INIT_BLOCK_UNIT - MMD_SIZE;
+            // allocate the new block
+            MetaData* new_block = (MetaData*)p_break;
+            new_block->size = size_of_data;
             new_block->is_free = true;
             new_block->next = NULL;
             new_block->prev = NULL;
+            addBlock_Sbrk(new_block);
 
-            if (current == NULL) {
-                size_t index = calcOrderOfBlock(new_block->size);
-                current = new_block;
-                smols_list[index] = current;
-            }
-            else {
-                current->next = new_block;
-                new_block->prev = current;
+            // stats
+            num_allocated_blocks += 1;
+            num_allocated_bytes += allocation_cost;
+
+            num_free_blocks += 1;
+            num_free_bytes += size_of_data;
+        }
+        
+    }
+
+    void removeFromList_Sbrk(MetaData* block) {
+        int order = blockOrder(block->size);
+        if (block->prev == NULL) {                              // first in list
+            sbrk_blocks[order] = sbrk_blocks[order]->next;
+            block->next = NULL;
+        }
+        else if (block->next == NULL) {                         // last in list
+            (block->prev)->next = NULL;
+            block->prev = NULL;
+        }
+        else {                                                  // in the middle
+            (block->prev)->next = block->next;
+            (block->next)->prev = block->prev;
+            block->prev = NULL;
+            block->next = NULL;
+        }
+    }
+
+    void splitBlock_Sbrk(MetaData* block) {
+        size_t new_total_size = (block->size + MMD_SIZE) / 2;
+        size_t new_mem_size = new_total_size - MMD_SIZE;
+
+        MetaData* buddy_block = (MetaData*)((char*)block + new_total_size);
+        buddy_block->size = new_mem_size;
+        buddy_block->is_free = true;
+        buddy_block->next = NULL;
+        buddy_block->prev = NULL;
+
+        // stats
+        num_free_blocks += 1;                                    // its a block and its free
+        num_free_bytes -= MMD_SIZE;                              // the new metadata is unusable to the user
+
+        block->size = new_mem_size;
+        addBlock_Sbrk(buddy_block);                              // return the buddy to the list
+    }
+
+    MetaData* findPotentialBlock_Sbrk(size_t size) {
+        int block_order = blockOrder(size);
+        for (int i = block_order; i <= MAX_ORDER; i++) {
+            MetaData* current = sbrk_blocks[block_order];
+            while (current != NULL) {
+                if (current->is_free) {                      // we don't need to check if the size is big enough bc the order compensates for that
+                    removeFromList_Sbrk(current);
+                    return current;
+                }
                 current = current->next;
             }
         }
-        this->num_allocated_blocks = INIT_NUM_BLOCKS;
-        this->num_allocated_bytes = ALLIGNMEMT_FACTOR;
-        this->num_free_blocks = INIT_NUM_BLOCKS;
-        this->num_free_bytes = ALLIGNMEMT_FACTOR;
+        return NULL;
     }
 
-    void* allocateSbrkBlock(size_t size) {                       // allocate block using sbrk
-        if (is_first_smalloc) {                                  // only malloc when asked
-            firstSbrkAllocs();
-            is_first_smalloc = false;
-        }
+    MetaData* findBuddy_Sbrk(MetaData* block) {
+        return (MetaData*)((uintptr_t)block ^ (block->size + MMD_SIZE));    // XOR trick (using the address of the current block and the total size)
+    }
 
-        MetaData* optimal_block = findBestBlockForSbrkAlloc(size);
-        if (optimal_block == NULL)
-            return NULL;
-        
-        // bc maybe we split it and recieve a lesser size
-        removeSbrkBlockFromList(optimal_block);
-        //start splitting
-        size_t half_block_size = (optimal_block->size + MMD_SIZE) / 2;
-        while((half_block_size >= (size + MMD_SIZE))
-           && (half_block_size >= INIT_BLOCK_UNIT)) // can split
+    void freeBlock_Sbrk(void* block) {                           // free allocated block
+        MetaData* p = getMetaData(block);
+        if (p->is_free == true)                                  // if already free i don't care
+            return;
+
+        if(p->size >= MAX_BLOCK_SIZE - MMD_SIZE)                // the size is bigger than max size - leave it be (too big to merge a ba bye)
         {
-            splitBlock(optimal_block);
-            half_block_size = (optimal_block->size + MMD_SIZE) / 2;
+            p->is_free = true;
+            addBlock_Sbrk(p);
+
+            // stats
+            this->num_free_blocks += 1;
+            this->num_free_bytes += p->size;
+            return;
+        }
+        while (true) {
+            MetaData* buddy = findBuddy_Sbrk(p);
+            if (buddy->is_free == false || buddy->size != p->size) {
+                break;                                           // Stop merging if buddy isn't free or sizes don't match
+            }
+            removeFromList_Sbrk(buddy);                          // we don't need him again in the list
+
+            // determine the lower address of the two
+            if ((uintptr_t)buddy < (uintptr_t)p) {
+                p = buddy;                                      // merge at lower address
+            }
+            p->size = (p->size + MMD_SIZE) * 2;                 // merge into a bigger block
             
             //stats
-            this->num_allocated_blocks += 1;
+            num_free_blocks -= 1;
+            num_free_bytes += MMD_SIZE;
         }
-        // after splitting for who knows how long, we add this block as well yay
-        addSbrkBlock(optimal_block);
-        //now we can use the block
-        optimal_block->is_free = false;
+        
+        //stats
+        this->num_free_blocks += 1;
+        this->num_free_bytes += p->size;
 
-        //add to statistics
-        this->num_free_blocks -= 1;
-        this->num_free_bytes -= size;
-
-        return optimal_block;
+        p->is_free = true;
+        addBlock_Sbrk(p);
     }
 
-    void* allocateMmapBlock(size_t size) {
-        void* new_block = mmap(NULL, MMD_SIZE + size, PROT_READ | PROT_WRITE,
-                                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        if(new_block == MAP_FAILED)
+    void* allocateBlock_Sbrk(size_t size) {                       // allocate block using sbrk
+        if (is_first_malloc)
+            firstAlloc_Sbrk();
+        
+        MetaData* potential_block = findPotentialBlock_Sbrk(size);
+        if (potential_block == NULL)                             // theres no big enough block srry babe
             return NULL;
 
-        MetaData* mmap_block = (MetaData*)new_block;
-        addMmapBlock(mmap_block);
-        mmap_block->size = size;
-        mmap_block->is_free = false;
-        mmap_block->next = NULL;
-        mmap_block->prev = NULL;
+        // there is?!?!?!? is it too big though
+        size_t half_block_size = (potential_block->size + MMD_SIZE) / 2;
+        while ((half_block_size > size + MMD_SIZE) &&
+               (half_block_size > BLOCK_UNIT)) {
+            splitBlock_Sbrk(potential_block);
+            half_block_size = (potential_block->size + MMD_SIZE) / 2;
+        }
 
-        //add to statistics
+        //finished splitting, now we use the block
+        potential_block->is_free = false;
+
+        //stats
+        num_free_blocks -= 1;
+        num_free_bytes -= size;
+
+        return potential_block;
+    }
+    
+    /* mmap implementation */
+    void addBlock_Mmap(MetaData* block) {                         // add allocated mmap block to list
+        if (mmap_blocks == NULL)
+            mmap_blocks = block;
+        else {                                                    // no need to keep mmap list organised
+            mmap_blocks->prev = block;                            // block->next | prev<-mmap_blocks
+            block->next = mmap_blocks;
+            mmap_blocks = block;
+        }
+    }
+
+    void removeBlock_Mmap(MetaData* block) {
+        if (block->prev == NULL) {                              // first in list
+            mmap_blocks = mmap_blocks->next;
+            block->next = NULL;
+        }
+        else if (block->next == NULL) {                         // last in list
+            (block->prev)->next = NULL;
+            block->prev = NULL;
+        }
+        else {                                                  // in the middle
+            (block->prev)->next = block->next;
+            (block->next)->prev = block->prev;
+            block->prev = NULL;
+            block->next = NULL;
+        }
+    }
+
+    void freeBlock_Mmap(void* block) {
+        MetaData* p = getMetaData(block);
+        removeBlock_Mmap(p);
+
+        //stats
+        this->num_allocated_blocks -= 1;
+        this->num_allocated_bytes -= p->size;
+
+        munmap(p, p->size + MMD_SIZE);
+    }
+
+    void* allocateBlock_Mmap(size_t size) {
+        void* mmap_block = mmap(NULL, MMD_SIZE + size, PROT_READ | PROT_WRITE,
+                               MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if(mmap_block == MAP_FAILED)
+            return NULL;
+
+        MetaData* new_block = (MetaData*)mmap_block;
+        new_block->size = size;
+        new_block->is_free = false;
+        new_block->next = NULL;
+        new_block->prev = NULL;
+
+        addBlock_Mmap(new_block);
+
+        //stats
         this->num_allocated_blocks += 1;
         this->num_allocated_bytes += size;
 
         return mmap_block;
     }
 
-    size_t numfreeSbrkBlocks() { return num_free_blocks; }
+    size_t numfreeBlock_Sbrks() { return num_free_blocks; }
     size_t numFreeBytes() { return num_free_bytes; }
     size_t numAllocatedBlocks() { return num_allocated_blocks; }
     size_t numAllocatedBytes() { return num_allocated_bytes; }
@@ -385,13 +359,7 @@ BlockList block_list = BlockList();
 void* smalloc(size_t size) {
     if (size == NO_SIZE || size > TOO_MUCH_SIZE)              // if size is 0 or bigger than 10^8
         return NULL;
-    void* new_block;
-    if( size >= MAX_SIZE_BLOCK) {
-        new_block = block_list.allocateMmapBlock(size);
-    }
-    else {
-        new_block = block_list.allocateSbrkBlock(size);
-    }
+    void* new_block = block_list.allocateBlock_Sbrk(size);
     if (new_block == NULL)
         return NULL;
     return (char*)new_block + MMD_SIZE;                      // return the allocated block with the address pointing to the memory asked for
@@ -428,13 +396,9 @@ void* scalloc(size_t num, size_t size) {
  * Presume that all pointers 'p' truly points to the beginning of an allocated block. 
  */
 void sfree(void* p) {
-    if(p == NULL)
+    if(p == NULL)                           // freeBlock_Sbrk doesn't do shit anyway so no need to check if already free idc
         return;
-    MetaData* block = block_list.getMetaData(p);
-    if(block->size > MAX_SIZE_BLOCK)
-        block_list.freeMmapBlock(p);                // even more easy peasy
-    else
-        block_list.freeSbrkBlock(p);                //easy peasy lemon squeezy
+    block_list.freeBlock_Sbrk(p);                //easy peasy lemon squeezy
 }
 
 /*
@@ -455,47 +419,14 @@ void* srealloc(void* oldp, size_t size) {
         return NULL;
     else if (oldp == NULL)
         return smalloc(size);
-    MetaData* metadata = block_list.getMetaData(oldp);
-    size_t old_size = metadata->size;
-    if (old_size > MAX_SIZE_BLOCK) {                              // mmap
-        if(size == old_size)                                      // need to make sure according to pdf
-            return oldp;
-        void* new_block = smalloc(size);
-        
-        if(new_block == NULL)                                     // faild
-            return NULL;
-        else if (size > old_size)                                 // pretty self explanatory
-            memmove(new_block, oldp, old_size);
-        else
-            memmove(new_block, oldp, size);
-        sfree(oldp);
-        
-        return new_block;
-    }
-    else {                                                        // sbrk
-        if(size <= old_size)                                          // if new size < old size - no need to allocate again
-            return oldp;
-        
-        //check to merge
-
-        /*if(table.can_merge_to_create_block(details,size)) // check if we can merge
-        {
-            //make it return the new Metadata
-            MetaData* new_allocated=table.merge_to_create_block(details,size);
-            void* adrees_of_data=(char*)new_allocated+sizeof(MetaData);
-            memmove(adrees_of_data,oldp,details->size);
-            new_allocated->is_free=false;
-            new_allocated->prev=NULL;
-            new_allocated->next=NULL;
-            return (char*)new_allocated+sizeof(MetaData);
-        } */
-    }
-
-    // else - cannot merge
+    size_t old_size = block_list.getMetaData(oldp)->size;
+    if(size <= old_size)                                          // if new size < old size - no need to allocate again
+        return oldp;
 
     void* new_block = smalloc(size);                              // using our lovely assistant smalloc we get a brand new spanking free block
     if (new_block == NULL)
         return NULL;                                              // or maybe not
+         /* dst,       src,  size*/
     memmove(new_block, oldp, old_size);                           // according to google it never fails so i don't check nothing
     sfree(oldp);   
     return new_block;
@@ -513,7 +444,7 @@ void* srealloc(void* oldp, size_t size) {
  * currently free.
  */
 size_t _num_free_blocks() {
-    return block_list.numfreeSbrkBlocks();
+    return block_list.numfreeBlock_Sbrks();
 }
 
 /* 

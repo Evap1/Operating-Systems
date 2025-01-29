@@ -1,0 +1,3 @@
+/home/student/Documents/GitHub/HW4/build/_deps/catch2-subbuild/CMakeFiles/catch2-populate.dir
+/home/student/Documents/GitHub/HW4/build/_deps/catch2-subbuild/CMakeFiles/edit_cache.dir
+/home/student/Documents/GitHub/HW4/build/_deps/catch2-subbuild/CMakeFiles/rebuild_cache.dir
