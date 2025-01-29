@@ -175,6 +175,35 @@ public:
         addBlock_Sbrk(buddy_block);                              // return the buddy to the list
     }
 
+    void checkIfNeedToSplit(MetaData* block, size_t size) {
+        size_t half_block_size = (block->size + MMD_SIZE) / 2;
+        while ((half_block_size > size + MMD_SIZE) && (half_block_size > BLOCK_UNIT)) {
+            splitBlock_Sbrk(block);
+            half_block_size = (block->size + MMD_SIZE) / 2;
+        }
+    }
+
+    int tryToMerge(MetaData** block, size_t size) {
+        while ((*block)->size < size) {                          // supposed to be always true when merging on free
+            MetaData* buddy = findBuddy_Sbrk(*block);
+            if (buddy->is_free == false || buddy->size != (*block)->size) {
+                return (*block)->size;                           // stop merging if buddy isn't free or sizes don't match
+            }
+            removeFromList_Sbrk(buddy);                          // we don't need him again in the list
+
+            // determine the lower address of the two
+            if ((uintptr_t)buddy < (uintptr_t)(*block)) {
+                *block = buddy;                                      // merge at lower address
+            }
+            (*block)->size = ((*block)->size + MMD_SIZE) * 2;                 // merge into a bigger block
+            
+            //stats
+            num_free_blocks -= 1;
+            num_free_bytes += MMD_SIZE;
+        }
+        return (*block)->size;
+    }
+
     MetaData* findPotentialBlock_Sbrk(size_t size) {
         int block_order = blockOrder(size);
         for (int i = block_order; i <= MAX_ORDER; i++) {
@@ -202,31 +231,15 @@ public:
         if(p->size >= MAX_BLOCK_SIZE - MMD_SIZE)                // the size is bigger than max size - leave it be (too big to merge a ba bye)
         {
             p->is_free = true;
-            addBlock_Sbrk(p);
 
             // stats
             this->num_free_blocks += 1;
             this->num_free_bytes += p->size;
             return;
         }
-        while (true) {
-            MetaData* buddy = findBuddy_Sbrk(p);
-            if (buddy->is_free == false || buddy->size != p->size) {
-                break;                                           // Stop merging if buddy isn't free or sizes don't match
-            }
-            removeFromList_Sbrk(buddy);                          // we don't need him again in the list
+        // returns the head of the new block after merge (if succeeded)
+        tryToMerge(&p, TOO_MUCH_SIZE);                          // never supposed to get there so condition will be true
 
-            // determine the lower address of the two
-            if ((uintptr_t)buddy < (uintptr_t)p) {
-                p = buddy;                                      // merge at lower address
-            }
-            p->size = (p->size + MMD_SIZE) * 2;                 // merge into a bigger block
-            
-            //stats
-            num_free_blocks -= 1;
-            num_free_bytes += MMD_SIZE;
-        }
-        
         //stats
         this->num_free_blocks += 1;
         this->num_free_bytes += p->size;
@@ -244,13 +257,7 @@ public:
             return NULL;
 
         // there is?!?!?!? is it too big though
-        size_t half_block_size = (potential_block->size + MMD_SIZE) / 2;
-        while ((half_block_size > size + MMD_SIZE) &&
-               (half_block_size > BLOCK_UNIT)) {
-            splitBlock_Sbrk(potential_block);
-            half_block_size = (potential_block->size + MMD_SIZE) / 2;
-        }
-
+        checkIfNeedToSplit(potential_block, size);              // also takes down the size
         //finished splitting, now we use the block
         potential_block->is_free = false;
 
@@ -292,6 +299,7 @@ public:
     void freeBlock_Mmap(void* block) {
         MetaData* p = getMetaData(block);
         removeBlock_Mmap(p);
+        p->is_free = true;
 
         //stats
         this->num_allocated_blocks -= 1;
@@ -354,12 +362,17 @@ BlockList block_list = BlockList();
  *  ii.	Failure –  
  *      a.	If size is 0 returns NULL. 
  *      b.	If ‘size’ is more than 108, return NULL. 
- *      c.	If sbrk fails in allocating the needed space, return NULL.  
+ *      c.	If fails in allocating the needed space, return NULL.  
  */
 void* smalloc(size_t size) {
     if (size == NO_SIZE || size > TOO_MUCH_SIZE)              // if size is 0 or bigger than 10^8
         return NULL;
-    void* new_block = block_list.allocateBlock_Sbrk(size);
+    void* new_block;
+    if( size >= MAX_BLOCK_SIZE)
+        new_block = block_list.allocateBlock_Sbrk(size);
+    else
+        new_block = block_list.allocateBlock_Mmap(size);
+
     if (new_block == NULL)
         return NULL;
     return (char*)new_block + MMD_SIZE;                      // return the allocated block with the address pointing to the memory asked for
@@ -375,7 +388,7 @@ void* smalloc(size_t size) {
  *  ii.	Failure –  
  *      a.	If size or num is 0 returns NULL. 
  *      b.	If ‘size * num’ is more than 108, return NULL. 
- *      c.	If sbrk fails in allocating the needed space, return NULL. 
+ *      c.	If fails in allocating the needed space, return NULL. 
  */
 void* scalloc(size_t num, size_t size) {
     if (num == NO_SIZE || num > TOO_MUCH_SIZE || size == NO_SIZE || size > TOO_MUCH_SIZE)
@@ -396,9 +409,16 @@ void* scalloc(size_t num, size_t size) {
  * Presume that all pointers 'p' truly points to the beginning of an allocated block. 
  */
 void sfree(void* p) {
-    if(p == NULL)                           // freeBlock_Sbrk doesn't do shit anyway so no need to check if already free idc
+    if(p == NULL)                                    // freeBlock_Sbrk doesn't do shit anyway so no need to check if already free idc
         return;
-    block_list.freeBlock_Sbrk(p);                //easy peasy lemon squeezy
+    MetaData* block = block_list.getMetaData(p);
+    if(block->is_free)
+        return;                                      //why did you bring this to me its free
+    
+    if (block->size >= MAX_BLOCK_SIZE)
+        block_list.freeBlock_Mmap(p);
+    else
+        block_list.freeBlock_Sbrk(p);                //easy peasy lemon squeezy
 }
 
 /*
@@ -411,25 +431,59 @@ void sfree(void* p) {
  * ii. Failure –  
  *   a.	If size is 0 returns NULL. 
  *   b.	If ‘size’ if more than 108, return NULL. 
- *   c.	If sbrk fails in allocating the needed space, return NULL.  
+ *   c.	If fails in allocating the needed space, return NULL.  
  *   d.	Do not free ‘oldp’ if srealloc() fails. 
+ * 
+ * can assume that they will not test cases where they will reallocate a normally allocated
+ * block to be resized to a block (excluding the meta-data) that’s more than 128kb
  */
 void* srealloc(void* oldp, size_t size) {
     if (size == NO_SIZE || size > TOO_MUCH_SIZE)                  // if size is 0 or bigger than 10^8
         return NULL;
     else if (oldp == NULL)
         return smalloc(size);
-    size_t old_size = block_list.getMetaData(oldp)->size;
-    if(size <= old_size)                                          // if new size < old size - no need to allocate again
-        return oldp;
 
-    void* new_block = smalloc(size);                              // using our lovely assistant smalloc we get a brand new spanking free block
-    if (new_block == NULL)
-        return NULL;                                              // or maybe not
-         /* dst,       src,  size*/
-    memmove(new_block, oldp, old_size);                           // according to google it never fails so i don't check nothing
-    sfree(oldp);   
-    return new_block;
+    MetaData* old_block = block_list.getMetaData(oldp);
+    size_t old_size = old_block->size;
+
+    // need to check which type of block is he
+    if(old_block->size > MAX_BLOCK_SIZE) {
+        if(size == old_size)                                          // if new size == old size - no need to allocate again
+            return oldp;
+        void *new_block = smalloc(size);
+        if (new_block == NULL)
+            return NULL;
+        
+        if (size <= old_block->size) {
+            memmove(new_block, oldp, size);
+        } else {
+            memmove(new_block, oldp, old_block->size);
+        }
+        sfree(oldp);
+        return new_block;
+    }
+    else {
+        if (size <= old_size) {                                   // need to split
+            block_list.checkIfNeedToSplit(old_block, size);
+            return oldp;
+        }
+        // else - so much bigger than expected (tis what she proclaimed)
+        int size_after_merge = block_list.tryToMerge(&old_block, size);
+        void* address_of_data = (char*)old_block + MMD_SIZE;
+        if (size_after_merge == size) {
+            old_block->is_free = false;
+            memmove(address_of_data, oldp, old_size);                // oldp still holds a pointer to the content of the old malloc
+            return address_of_data;                                 // return the pointer after the metadata - oldp not supposed to be in the list
+        }
+        // else - we couldn't merge a big enough slice - time to malloc a new ho
+        void* new_block = smalloc(size);                              // using our lovely assistant smalloc we get a brand new spanking free block
+        if (new_block == NULL)
+            return NULL;                                              // or maybe not
+            /* dst,       src,  size*/
+        memmove(new_block, oldp, old_size);                           // according to google it never fails so i don't check nothing
+        sfree(oldp);   
+        return new_block;
+    }
 }
 
 /*
