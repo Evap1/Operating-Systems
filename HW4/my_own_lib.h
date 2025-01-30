@@ -22,6 +22,6 @@ size_t _size_meta_data();
         printf("Total Allocated Bytes: %zu\n",  _num_allocated_bytes());
         printf("Free Blocks: %zu\n",            _num_free_blocks());
         printf("Free Bytes: %zu\n",             _num_free_bytes());
-        printf("Metadata Bytes: %zu\n\n",         _num_free_bytes() * 30);
+        printf("Metadata Bytes: %zu\n\n",         _num_free_blocks() * 32);
     }
 #endif /* MY_STDLIB_H */
