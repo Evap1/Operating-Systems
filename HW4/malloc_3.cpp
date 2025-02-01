@@ -504,7 +504,7 @@ void* srealloc(void* oldp, size_t size) {
             return NULL;                                        // or maybe not
             /* dst,       src,  size*/
         memmove(new_block, oldp, old_size);                     // according to google it never fails so i don't check nothing
-        sfree(oldp);   
+        sfree(address_of_data);   
         return new_block;
     }
 }
